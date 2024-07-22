@@ -36,7 +36,7 @@ find_package(PkgConfig)
 option(UMF_BUILD_SHARED_LIBRARY "Build UMF as shared library" OFF)
 option(UMF_BUILD_LEVEL_ZERO_PROVIDER "Build Level Zero memory provider" ON)
 option(UMF_BUILD_LIBUMF_POOL_DISJOINT
-       "Build the libumf_pool_disjoint static library" ON) #CHANGEDONCENOTAGAIN
+       "Build the libumf_pool_disjoint static library" ON) # CHANGEDONCENOTAGAIN
 option(UMF_BUILD_LIBUMF_POOL_JEMALLOC
        "Build the libumf_pool_jemalloc static library" OFF)
 option(UMF_BUILD_TESTS "Build UMF tests" ON)
@@ -45,7 +45,7 @@ option(UMF_BUILD_BENCHMARKS "Build UMF benchmarks" OFF)
 option(UMF_BUILD_BENCHMARKS_MT "Build UMF multithreaded benchmarks" OFF)
 option(UMF_BUILD_EXAMPLES "Build UMF examples" ON)
 option(UMF_BUILD_FUZZTESTS "Build UMF fuzz tests" OFF)
-option(UMF_BUILD_GPU_EXAMPLES "Build UMF GPU examples" ON) #CHANGED
+option(UMF_BUILD_GPU_EXAMPLES "Build UMF GPU examples" ON) # CHANGED
 option(UMF_DEVELOPER_MODE "Enable additional developer checks" OFF)
 option(UMF_LINK_HWLOC_STATICALLY
        "Link UMF with HWLOC library statically (Windows+Release only)" OFF)
