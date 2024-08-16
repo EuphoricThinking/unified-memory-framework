@@ -111,7 +111,7 @@ TEST_P(memspaceGetTest, providerFromMemspace) {
     // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     //UT_ASSERTne(hProvider, nullptr);
-    ASSERT_EQ(hProvider, nullptr);
+    ASSERT_NE(hProvider, nullptr);
 
     umfMemoryProviderDestroy(hProvider);
 }
@@ -122,15 +122,18 @@ TEST_P(memspaceProviderTest, allocFree) {
     size_t alignment = 0;
 
     umf_result_t ret = umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
-    UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
-    UT_ASSERTne(ptr, nullptr);
+    //UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+    ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
+    // UT_ASSERTne(ptr, nullptr);
+    ASSERT_NE(ptr, nullptr);
 
     // Access the allocation, so that all the pages associated with it are
     // allocated on some NUMA node.
     memset(ptr, 0xFF, size);
 
     ret = umfMemoryProviderFree(hProvider, ptr, size);
-    UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+    ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 }
 
 static std::vector<int> getAllCpus() {
