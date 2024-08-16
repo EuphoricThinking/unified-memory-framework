@@ -82,7 +82,7 @@ jobs:
     uses: ./.github/workflows/spellcheck.yml
   FastBuild:
     name: Fast builds
-    needs: [Spellcheck, CodeStyle]
+    # needs: [Spellcheck, CodeStyle]
     uses: ./.github/workflows/fast.yml
   Build:
     name: Basic builds
