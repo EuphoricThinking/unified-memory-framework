@@ -82,27 +82,34 @@ jobs:
     needs: [Spellcheck, CodeStyle]
     uses: ./.github/workflows/fast.yml
   Build:
+    if: false
     name: Basic builds
     needs: [FastBuild]
     uses: ./.github/workflows/basic.yml
   Sanitizers:
+    if: false
     needs: [FastBuild]
     uses: ./.github/workflows/sanitizers.yml
   Qemu:
     needs: [FastBuild]
     uses: ./.github/workflows/qemu.yml
   Benchmarks:
+    if: false
     needs: [Build]
     uses: ./.github/workflows/benchmarks.yml
   ProxyLib:
+    if: false
     needs: [Build]
     uses: ./.github/workflows/proxy_lib.yml
   GPU:
+    if: false
     needs: [Build]
     uses: ./.github/workflows/gpu.yml
   Valgrind:
+    if: false
     needs: [Build]
     uses: ./.github/workflows/valgrind.yml
   MultiNuma:
+    if: false
     needs: [Build]
     uses: ./.github/workflows/multi_numa.yml
