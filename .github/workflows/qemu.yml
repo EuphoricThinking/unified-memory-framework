@@ -1,11 +1,7 @@
 # Builds project on qemu with custom hmat settings
 name: Qemu
 
-on:
-  push:
-    branches-ignore:
-      - 'dependabot/**'
-  # workflow_call:
+on: workflow_call
 
 env:
   CI_BRANCH: "${{ github.head_ref || github.ref_name }}"

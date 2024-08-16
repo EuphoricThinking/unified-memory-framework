@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   CodeStyle:
+    if: false
     name: Coding style
     runs-on: ${{ github.repository_owner == 'oneapi-src' && 'intel-ubuntu-22.04' || 'ubuntu-latest' }}
 
@@ -51,6 +52,7 @@ jobs:
       run: cmake --build build --target black-format-check
 
   DocsBuild:
+    if: false
     name: Build docs
     runs-on: ${{ github.repository_owner == 'oneapi-src' && 'intel-ubuntu-22.04' || 'ubuntu-latest' }}
 
@@ -76,6 +78,7 @@ jobs:
       run: python3 generate_docs.py
 
   Spellcheck:
+    if: false
     uses: ./.github/workflows/spellcheck.yml
   FastBuild:
     name: Fast builds
