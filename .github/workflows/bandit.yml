@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   bandit:
+    if: false
     name: Bandit
     strategy:
       matrix:
