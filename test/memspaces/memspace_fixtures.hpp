@@ -108,8 +108,10 @@ TEST_P(memspaceGetTest, providerFromMemspace) {
     umf_memory_provider_handle_t hProvider = nullptr;
     umf_result_t ret =
         umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
-    UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
-    UT_ASSERTne(hProvider, nullptr);
+    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+    ASSERT_NE(ret, UMF_RESULT_SUCCESS);
+    //UT_ASSERTne(hProvider, nullptr);
+    ASSERT_NE(hProvider, nullptr);
 
     umfMemoryProviderDestroy(hProvider);
 }
