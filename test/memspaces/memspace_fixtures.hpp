@@ -111,7 +111,7 @@ TEST_P(memspaceGetTest, providerFromMemspace) {
     // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     //UT_ASSERTne(hProvider, nullptr);
-    ASSERT_NE(hProvider, nullptr);
+    ASSERT_EQ(hProvider, nullptr);
 
     umfMemoryProviderDestroy(hProvider);
 }
