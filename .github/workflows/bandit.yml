@@ -1,6 +1,5 @@
 # Bandit static analysis (for Python code)
 name: Bandit
-if: false
 
 on:
   push:
@@ -17,6 +16,7 @@ permissions:
 
 jobs:
   bandit:
+    if: false
     name: Bandit
     strategy:
       matrix:
