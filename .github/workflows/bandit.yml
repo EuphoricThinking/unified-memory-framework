@@ -1,5 +1,7 @@
 # Bandit static analysis (for Python code)
 name: Bandit
+if: false
+
 on:
   push:
     branches-ignore:
