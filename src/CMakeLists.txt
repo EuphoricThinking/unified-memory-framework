@@ -128,7 +128,7 @@ else()
     message(STATUS "UMF_OPTIONAL_SYMBOLS: ${UMF_OPTIONAL_SYMBOLS_LINUX}")
 endif()
 
-# Configure the DEF file based on whether Level Zero provider is built
+# Configure map/def files with optional symbols
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/libumf.def.in"
                "${CMAKE_CURRENT_BINARY_DIR}/libumf.def" @ONLY)
 
@@ -168,8 +168,8 @@ if(UMF_BUILD_SHARED_LIBRARY)
     set_target_properties(
         umf
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_UMF_OUTPUT_DIRECTORY}
-                   VERSION ${CMAKE_PROJECT_VERSION}
-                   SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR})
+                   VERSION ${PROJECT_VERSION}
+                   SOVERSION ${PROJECT_VERSION_MAJOR})
 else()
     add_umf_library(
         NAME umf
