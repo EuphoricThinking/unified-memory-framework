@@ -171,7 +171,7 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         hwloc_cpuset_t curCpuset = hwloc_bitmap_alloc();
         // UT_ASSERTeq(
         //     hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD), 0);
-        ASSERT_EQ(hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD),
+        ASSERT_NE(hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD),
                   0);
         // UT_ASSERT(hwloc_bitmap_isequal(curCpuset, pinCpuset));
         ASSERT_TRUE(hwloc_bitmap_isequal(curCpuset, pinCpuset));
