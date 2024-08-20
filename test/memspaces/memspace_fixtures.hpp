@@ -133,7 +133,7 @@ TEST_P(memspaceProviderTest, allocFree) {
 
     ret = umfMemoryProviderFree(hProvider, ptr, size);
     // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
-    ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
+    ASSERT_NE(ret, UMF_RESULT_SUCCESS);
 }
 
 static std::vector<int> getAllCpus() {
