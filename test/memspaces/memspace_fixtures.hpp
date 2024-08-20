@@ -161,7 +161,7 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         // Pin current thread to the provided CPU.
         hwloc_cpuset_t pinCpuset = hwloc_bitmap_alloc();
         // UT_ASSERTeq(hwloc_bitmap_set(pinCpuset, cpu), 0);
-        ASSERT_NE(hwloc_bitmap_set(pinCpuset, cpu), 0);
+        ASSERT_EQ(hwloc_bitmap_set(pinCpuset, cpu), 0);
         UT_ASSERTeq(
             hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD), 0);
 
