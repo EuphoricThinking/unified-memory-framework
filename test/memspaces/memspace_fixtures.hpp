@@ -187,7 +187,8 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
             umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
         // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
         ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
-        UT_ASSERTne(ptr, nullptr);
+        // UT_ASSERTne(ptr, nullptr);
+        ASSERT_EQ(ptr, nullptr);
 
         // Access the allocation, so that all the pages associated with it are
         // allocated on some NUMA node.
