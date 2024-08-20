@@ -164,15 +164,15 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         ASSERT_EQ(hwloc_bitmap_set(pinCpuset, cpu), 0);
         //UT_ASSERTeq(
         //    hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD), 0);
-        ASSERT_EQ(
-            hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD), 0);
+        ASSERT_NE(hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD),
+                  0);
 
         // Confirm that the thread is pinned to the provided CPU.
         hwloc_cpuset_t curCpuset = hwloc_bitmap_alloc();
         // UT_ASSERTeq(
         //     hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD), 0);
-        ASSERT_EQ(
-            hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD), 0);
+        ASSERT_EQ(hwloc_get_cpubind(topology, curCpuset, HWLOC_CPUBIND_THREAD),
+                  0);
         // UT_ASSERT(hwloc_bitmap_isequal(curCpuset, pinCpuset));
         ASSERT_TRUE(hwloc_bitmap_isequal(curCpuset, pinCpuset));
         hwloc_bitmap_free(curCpuset);
@@ -213,8 +213,8 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         //                                           localNodes.data(), 0),
         //             0);
         ASSERT_EQ(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
-                                                  localNodes.data(), 0),
-                    0);
+                                                localNodes.data(), 0),
+                  0);
         // UT_ASSERT(nNodes <= MAX_NODES);
         ASSERT_TRUE(nNodes <= MAX_NODES);
 
@@ -225,9 +225,9 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         //                           return node == allocNodeObj;
         //                       }));
         ASSERT_TRUE(std::any_of(localNodes.begin(), localNodes.end(),
-                              [&allocNodeObj](hwloc_obj_t node) {
-                                  return node == allocNodeObj;
-                              }));
+                                [&allocNodeObj](hwloc_obj_t node) {
+                                    return node == allocNodeObj;
+                                }));
 
         ret = umfMemoryProviderFree(hProvider, ptr, size);
         // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
