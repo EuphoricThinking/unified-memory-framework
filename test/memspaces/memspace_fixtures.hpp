@@ -212,7 +212,7 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         // UT_ASSERTeq(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
         //                                           localNodes.data(), 0),
         //             0);
-        ASSERT_NE(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
+        ASSERT_EQ(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
                                                 localNodes.data(), 0),
                   0);
         // UT_ASSERT(nNodes <= MAX_NODES);
