@@ -215,7 +215,8 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         ASSERT_EQ(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
                                                   localNodes.data(), 0),
                     0);
-        UT_ASSERT(nNodes <= MAX_NODES);
+        // UT_ASSERT(nNodes <= MAX_NODES);
+        ASSERT_FALSE(nNodes <= MAX_NODES);
 
         // Confirm that the allocation from this thread was made to a local
         // NUMA node.
