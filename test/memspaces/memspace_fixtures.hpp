@@ -186,7 +186,7 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         umf_result_t ret =
             umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
         // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
-        ASSERT_NE(ret, UMF_RESULT_SUCCESS);
+        ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
         // UT_ASSERTne(ptr, nullptr);
         ASSERT_NE(ptr, nullptr);
 
