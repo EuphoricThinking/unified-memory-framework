@@ -162,7 +162,9 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         hwloc_cpuset_t pinCpuset = hwloc_bitmap_alloc();
         // UT_ASSERTeq(hwloc_bitmap_set(pinCpuset, cpu), 0);
         ASSERT_EQ(hwloc_bitmap_set(pinCpuset, cpu), 0);
-        UT_ASSERTeq(
+        //UT_ASSERTeq(
+        //    hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD), 0);
+        ASSERT_NE(
             hwloc_set_cpubind(topology, pinCpuset, HWLOC_CPUBIND_THREAD), 0);
 
         // Confirm that the thread is pinned to the provided CPU.
