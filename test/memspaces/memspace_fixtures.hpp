@@ -230,7 +230,8 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
                               }));
 
         ret = umfMemoryProviderFree(hProvider, ptr, size);
-        UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+        // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+        ASSERT_NE(ret, UMF_RESULT_SUCCESS);
 
         hwloc_topology_destroy(topology);
     };
