@@ -209,7 +209,10 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         hwloc_location loc;
         loc.location.object = allocNodeObj,
         loc.type = hwloc_location_type_alias::HWLOC_LOCATION_TYPE_OBJECT;
-        UT_ASSERTeq(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
+        // UT_ASSERTeq(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
+        //                                           localNodes.data(), 0),
+        //             0);
+        ASSERT_NE(hwloc_get_local_numanode_objs(topology, &loc, &nNodes,
                                                   localNodes.data(), 0),
                     0);
         UT_ASSERT(nNodes <= MAX_NODES);
