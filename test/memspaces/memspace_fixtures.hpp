@@ -224,7 +224,7 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
         //                       [&allocNodeObj](hwloc_obj_t node) {
         //                           return node == allocNodeObj;
         //                       }));
-        ASSERT_FALSE(std::any_of(localNodes.begin(), localNodes.end(),
+        ASSERT_TRUE(std::any_of(localNodes.begin(), localNodes.end(),
                                 [&allocNodeObj](hwloc_obj_t node) {
                                     return node == allocNodeObj;
                                 }));
