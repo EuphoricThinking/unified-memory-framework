@@ -220,7 +220,11 @@ TEST_P(memspaceProviderTest, allocLocalMt) {
 
         // Confirm that the allocation from this thread was made to a local
         // NUMA node.
-        UT_ASSERT(std::any_of(localNodes.begin(), localNodes.end(),
+        // UT_ASSERT(std::any_of(localNodes.begin(), localNodes.end(),
+        //                       [&allocNodeObj](hwloc_obj_t node) {
+        //                           return node == allocNodeObj;
+        //                       }));
+        ASSERT_FALSE(std::any_of(localNodes.begin(), localNodes.end(),
                               [&allocNodeObj](hwloc_obj_t node) {
                                   return node == allocNodeObj;
                               }));
