@@ -9,6 +9,13 @@
 #include "memspace_internal.h"
 #include "test_helpers.h"
 
+/*
+
+canQueryLatency is used in a parameter generator as a functional pointer
+ https://man.archlinux.org/man/hwloc_memattr_get_value.3.en
+ 0 on success - hwloc_memattr_get_value
+*/
+
 static bool canQueryLatency(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
