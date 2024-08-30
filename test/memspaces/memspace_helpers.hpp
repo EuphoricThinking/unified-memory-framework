@@ -16,6 +16,8 @@
 #define SIZE_4K (4096UL)
 #define SIZE_4M (SIZE_4K * 1024UL)
 
+#define IS_SKIPPED_OR_FAILED() (HasFatalFailure() || IsSkipped())
+
 ///
 /// @brief Retrieves the memory policy information for \p ptr.
 /// @param ptr allocation pointer.

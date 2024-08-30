@@ -51,7 +51,7 @@ struct numaNodesTest : ::umf_test::test {
     unsigned long maxNodeId = 0;
 };
 
-using isQuerySupportedFunc = bool (*)(size_t);
+using isQuerySupportedFunc = void (*)(size_t);
 using memspaceGetFunc = umf_const_memspace_handle_t (*)();
 using memspaceGetParams = std::tuple<isQuerySupportedFunc, memspaceGetFunc>;
 
@@ -65,9 +65,10 @@ struct memspaceGetTest : ::numaNodesTest,
         }
 
         auto [isQuerySupported, memspaceGet] = this->GetParam();
+        isQuerySupported(nodeIds.front());
 
-        if (!isQuerySupported(nodeIds.front())) {
-            GTEST_SKIP();
+        if (IS_SKIPPED_OR_FAILED()) {
+            return;
         }
 
         hMemspace = memspaceGet();
@@ -81,8 +82,15 @@ struct memspaceProviderTest : ::memspaceGetTest {
     void SetUp() override {
         ::memspaceGetTest::SetUp();
 
-        if (::memspaceGetTest::IsSkipped()) {
+        if (numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
             GTEST_SKIP();
+        }
+
+        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
+        isQuerySupported(nodeIds.front());
+
+        if (IS_SKIPPED_OR_FAILED()) {
+            return;
         }
 
         umf_result_t ret =
