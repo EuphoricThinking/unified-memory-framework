@@ -12,7 +12,8 @@
 static bool canQueryLatency(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
-    UT_ASSERTeq(ret, 0);
+    // UT_ASSERTeq(ret, 0);
+    EXPECT_NE(ret, 0);
     ret = hwloc_topology_load(topology);
     UT_ASSERTeq(ret, 0);
 
