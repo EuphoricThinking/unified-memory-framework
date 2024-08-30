@@ -66,7 +66,7 @@ struct memspaceGetTest : ::numaNodesTest,
         auto [isQuerySupported, memspaceGet] = this->GetParam();
 
         if (!isQuerySupported(nodeIds.front())) {
-            GTEST_SKIP();
+            GTEST_FAIL();
         }
 
         hMemspace = memspaceGet();
@@ -80,8 +80,14 @@ struct memspaceProviderTest : ::memspaceGetTest {
     void SetUp() override {
         ::memspaceGetTest::SetUp();
 
-        if (::memspaceGetTest::IsSkipped()) {
+        if (numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
             GTEST_SKIP();
+        }
+
+        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
+
+        if (!isQuerySupported(nodeIds.front())) {
+            GTEST_FAIL();
         }
 
         umf_result_t ret =
