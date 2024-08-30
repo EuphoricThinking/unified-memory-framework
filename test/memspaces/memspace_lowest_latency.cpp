@@ -14,13 +14,20 @@
 canQueryLatency is used in a parameter generator as a functional pointer
  https://man.archlinux.org/man/hwloc_memattr_get_value.3.en
  0 on success - hwloc_memattr_get_value
+ assume overall failure
+expect instead of add_failure: more verbosity
 */
 
 static bool canQueryLatency(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
     // UT_ASSERTeq(ret, 0);
-    EXPECT_NE(ret, 0);
+    // EXPECT_NE(ret, 0);
+    if (ret == 0) {
+        //ADD_FAILURE();
+        EXPECT_NE(ret, 0);
+        return true; //false;
+    }
     ret = hwloc_topology_load(topology);
     UT_ASSERTeq(ret, 0);
 

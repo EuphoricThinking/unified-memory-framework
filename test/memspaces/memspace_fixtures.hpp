@@ -80,7 +80,11 @@ struct memspaceProviderTest : ::memspaceGetTest {
     void SetUp() override {
         ::memspaceGetTest::SetUp();
 
+        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
+        bool restinpiss = isQuerySupported(nodeIds.front());
+        ASSERT_TRUE(false) << "is skipped?" << ::memspaceGetTest::IsSkipped() << " | res: " << restinpiss;
         if (::memspaceGetTest::IsSkipped()) {
+            // it uses a method from superclass as its own, so fuck you
             GTEST_SKIP();
         }
 
