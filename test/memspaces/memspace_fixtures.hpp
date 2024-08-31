@@ -66,7 +66,8 @@ struct memspaceGetTest : ::numaNodesTest,
         auto [isQuerySupported, memspaceGet] = this->GetParam();
 
         if (!isQuerySupported(nodeIds.front())) {
-            GTEST_SKIP() << "Skipping 1";
+            // GTEST_SKIP() << "Skipping 1";
+            GTEST_FAIL() << "Intended failure from query";
         }
 
         hMemspace = memspaceGet();

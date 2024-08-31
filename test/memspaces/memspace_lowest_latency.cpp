@@ -26,6 +26,8 @@ static bool canQueryLatency(size_t nodeId) {
     if (ret == 0) {
         //ADD_FAILURE();
     //    EXPECT_NE(ret, 0);
+        std::cerr << "stderr ret is not 0 at line: " << __LINE__ << " in file: " << __FILE__ << std::endl;
+
         return false;
     }
     ret = hwloc_topology_load(topology);
