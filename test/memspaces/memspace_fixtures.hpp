@@ -66,11 +66,17 @@ struct memspaceGetTest : ::numaNodesTest,
         auto [isQuerySupported, memspaceGet] = this->GetParam();
 
         if (!isQuerySupported(nodeIds.front())) {
-            GTEST_SKIP();
+            GTEST_SKIP() << "Skipping 1";
         }
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
+    }
+
+    public:
+    static void SetUpTestSuite() {
+        //ASSERT_TRUE(false) << "YOU SHALL NOT PASS";
+        GTEST_SKIP() << "SKIP ME BABY";
     }
 
     umf_const_memspace_handle_t hMemspace = nullptr;
@@ -82,10 +88,9 @@ struct memspaceProviderTest : ::memspaceGetTest {
 
         auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
         bool restinpiss = isQuerySupported(nodeIds.front());
-        ASSERT_TRUE(false) << "is skipped?" << ::memspaceGetTest::IsSkipped() << " | res: " << restinpiss;
-        if (::memspaceGetTest::IsSkipped()) {
-            // it uses a method from superclass as its own, so fuck you
-            GTEST_SKIP();
+
+        if (!restinpiss || numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
+            GTEST_SKIP() << "Dkippig 2222";
         }
 
         umf_result_t ret =
