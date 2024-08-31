@@ -73,11 +73,11 @@ struct memspaceGetTest : ::numaNodesTest,
         ASSERT_NE(hMemspace, nullptr);
     }
 
-    public:
-    static void SetUpTestSuite() {
-        //ASSERT_TRUE(false) << "YOU SHALL NOT PASS";
-        GTEST_SKIP() << "SKIP ME BABY";
-    }
+    // public:
+    // static void SetUpTestSuite() {
+    //     //ASSERT_TRUE(false) << "YOU SHALL NOT PASS";
+    //     GTEST_SKIP() << "SKIP ME BABY";
+    // }
 
     umf_const_memspace_handle_t hMemspace = nullptr;
 };

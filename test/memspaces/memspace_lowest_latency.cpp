@@ -16,6 +16,7 @@ canQueryLatency is used in a parameter generator as a functional pointer
  0 on success - hwloc_memattr_get_value
  assume overall failure
 expect instead of add_failure: more verbosity
+where it is used canQuery
 */
 
 static bool canQueryLatency(size_t nodeId) {
