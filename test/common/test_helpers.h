@@ -42,6 +42,20 @@ static inline void UT_OUT(const char *format, ...) {
     fprintf(stdout, "\n");
 }
 
+static inline bool UT_LOG_ERR(const char *format, ...) {
+    va_list args_list;
+    va_start(args_list, format);
+    vfprintf(stderr, format, args_list);
+    va_end(args_list);
+
+    fprintf(stderr, "\n");
+
+    return false;
+}
+
+#define GTEST_OUT(cnd) ((bool)((cnd) || (UT_LOG_ERR("%s:%d %s - assertion failure\nExpected: %s", __FILE__,   \
+                               __LINE__, __func__, #cnd),                      \
+                      0)))
 // Assert a condition is true at runtime
 #define UT_ASSERT(cnd)                                                         \
     ((void)((cnd) || (UT_FATAL("%s:%d %s - assertion failure: %s", __FILE__,   \

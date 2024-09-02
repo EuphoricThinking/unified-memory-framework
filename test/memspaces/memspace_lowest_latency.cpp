@@ -23,11 +23,16 @@ static bool canQueryLatency(size_t nodeId) {
     int ret = hwloc_topology_init(&topology);
     // UT_ASSERTeq(ret, 0);
     // EXPECT_NE(ret, 0);
-    if (ret == 0) {
-        //ADD_FAILURE();
-    //    EXPECT_NE(ret, 0);
-        std::cerr << "stderr ret is not 0 at line: " << __LINE__ << " in file: " << __FILE__ << std::endl;
+    // if (ret == 0) {
+    //     //ADD_FAILURE();
+    // //    EXPECT_NE(ret, 0);
+    //     std::cerr << "stderr ret is not 0 at line: " << __LINE__ << " in file: " << __FILE__ << std::endl;
+    //     GTEST_OUT_EQ
 
+    //     return false;
+    // }
+    if (!(GTEST_OUT(ret != 0))) {
+        EXPECT_NE(ret, 0);
         return false;
     }
     ret = hwloc_topology_load(topology);
