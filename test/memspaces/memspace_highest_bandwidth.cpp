@@ -12,18 +12,20 @@
 static bool canQueryBandwidth(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
-    // UT_ASSERTeq(ret, 0);
+
     if (!GTEST_OUT_EQ(ret, 0)){
         return false;
     }
+
     ret = hwloc_topology_load(topology);
-    // UT_ASSERTeq(ret, 0);
+
     if (!GTEST_OUT_EQ(ret, 0)) {
         return false;
     }
+
     hwloc_obj_t numaNode =
         hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, nodeId);
-    // UT_ASSERTne(numaNode, nullptr);
+
     if (!GTEST_OUT_NE(numaNode, nullptr)){
         return false;
     }
@@ -45,7 +47,6 @@ static bool canQueryBandwidth(size_t nodeId) {
     else {
         return true;
     }
-    //return (ret == 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(memspaceLowestLatencyTest, memspaceGetTest,
