@@ -37,7 +37,7 @@ static bool canQueryLatency(size_t nodeId) {
     }
     ret = hwloc_topology_load(topology);
     //UT_ASSERTeq(ret, 0);
-    if (!GTEST_OUT_NE(ret, 0)) {
+    if (!GTEST_OUT_EQ(ret, 0)) {
         return false;
     }
 
