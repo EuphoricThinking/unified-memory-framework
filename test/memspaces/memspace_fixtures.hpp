@@ -87,11 +87,14 @@ struct memspaceProviderTest : ::memspaceGetTest {
     void SetUp() override {
         ::memspaceGetTest::SetUp();
 
-        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
-        bool restinpiss = isQuerySupported(nodeIds.front());
+        // auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
+        // bool restinpiss = isQuerySupported(nodeIds.front());
 
-        if (!restinpiss || numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
-            GTEST_SKIP() << "Dkippig 2222";
+        // if (!restinpiss || numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
+        //     GTEST_SKIP() << "Dkippig 2222";
+        // }
+        if (::memspaceGetTest::IsSkipped()) {
+            GTEST_SKIP() << "SIPPING I WAS WROOONG";
         }
 
         umf_result_t ret =
