@@ -36,11 +36,17 @@ static bool canQueryLatency(size_t nodeId) {
         return false;
     }
     ret = hwloc_topology_load(topology);
-    UT_ASSERTeq(ret, 0);
+    //UT_ASSERTeq(ret, 0);
+    if (!(GTEST_OUT_EQ(ret, 0))) {
+        return false;
+    }
 
     hwloc_obj_t numaNode =
         hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, nodeId);
-    UT_ASSERTne(numaNode, nullptr);
+    //UT_ASSERTne(numaNode, nullptr);
+    if (!(GTEST_OUT_NE(numaNode, nullptr))) {
+        return false;
+    }
 
     // Setup initiator structure.
     struct hwloc_location initiator;

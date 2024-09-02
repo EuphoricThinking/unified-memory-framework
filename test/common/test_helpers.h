@@ -55,8 +55,7 @@ static inline bool UT_LOG_ERR(const char *format, ...) {
 
 #define GTEST_OUT_EQ(lhs, rhs)                                                  \
     ((bool)(((lhs) == (rhs)) ||                                                \
-            (UT_LOG_ERR("%s:%d %s - assertion failure\n\
-            Expected: %s == %s, actual: (0x%llx) vs (0x%llx)"     \
+            (UT_LOG_ERR("%s:%d %s - assertion failure\nExpected: %s == %s, actual: (0x%llx) vs (0x%llx)"     \
                       ,                                              \
                       __FILE__, __LINE__, __func__, #lhs,                      \
                       #rhs, (unsigned long long)(lhs),                         \
