@@ -53,9 +53,24 @@ static inline bool UT_LOG_ERR(const char *format, ...) {
     return false;
 }
 
-#define GTEST_OUT(cnd) ((bool)((cnd) || (UT_LOG_ERR("%s:%d %s - assertion failure\nExpected: %s", __FILE__,   \
-                               __LINE__, __func__, #cnd),                      \
-                      0)))
+#define GTEST_OUT_EQ(lhs, rhs)                                                  \
+    ((bool)(((lhs) == (rhs)) ||                                                \
+            (UT_LOG_ERR("%s:%d %s - assertion failure\n\
+            Expected: %s == %s, actual: (0x%llx) vs (0x%llx)"     \
+                      ,                                              \
+                      __FILE__, __LINE__, __func__, #lhs,                      \
+                      #rhs, (unsigned long long)(lhs),                         \
+                      (unsigned long long)(rhs)),                              \
+             0)))
+        
+#define GTEST_OUT_NE(lhs, rhs)                                                  \
+    ((bool)(((lhs) != (rhs)) ||                                                \
+            (UT_LOG_ERR("%s:%d %s - assertion failure\nExpected: %s != %s, actual: %llx vs %llx"     \
+                      ,                                              \
+                      __FILE__, __LINE__, __func__, #lhs,                      \
+                      #rhs, (unsigned long long)(lhs),                         \
+                      (unsigned long long)(rhs)),                              \
+             0)))
 // Assert a condition is true at runtime
 #define UT_ASSERT(cnd)                                                         \
     ((void)((cnd) || (UT_FATAL("%s:%d %s - assertion failure: %s", __FILE__,   \

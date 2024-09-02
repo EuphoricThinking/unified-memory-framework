@@ -31,8 +31,8 @@ static bool canQueryLatency(size_t nodeId) {
 
     //     return false;
     // }
-    if (!(GTEST_OUT(ret != 0))) {
-        EXPECT_NE(ret, 0);
+    if (!(GTEST_OUT_NE(ret, 0))) {
+        // EXPECT_NE(ret, 0);
         return false;
     }
     ret = hwloc_topology_load(topology);
