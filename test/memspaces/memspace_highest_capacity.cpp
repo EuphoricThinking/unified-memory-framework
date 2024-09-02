@@ -21,12 +21,13 @@ struct memspaceHighestCapacityProviderTest : ::numaNodesTest {
         ::numaNodesTest::SetUp();
 
         umf_const_memspace_handle_t hMemspace = umfMemspaceHighestCapacityGet();
-        UT_ASSERTne(hMemspace, nullptr);
+        // UT_ASSERTne(hMemspace, nullptr);
+        ASSERT_NE(hMemspace, nullptr);  // **SEGFAULT** EQ
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
-        ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
-        ASSERT_NE(hProvider, nullptr);
+        ASSERT_EQ(ret, UMF_RESULT_SUCCESS); // *Failed* when NE
+        ASSERT_NE(hProvider, nullptr); // *Failed* when EQ
     }
 
     void TearDown() override {
@@ -60,7 +61,7 @@ TEST_F(memspaceHighestCapacityProviderTest, highestCapacityVerify) {
     memset(ptr, 0, alloc_size);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
-    int nodeId;
+    int nodeId = 0;
 
     ASSERT_NO_FATAL_FAILURE(getNumaNodeByPtr(ptr, &nodeId));
 
