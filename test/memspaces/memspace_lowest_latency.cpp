@@ -31,7 +31,7 @@ static bool canQueryLatency(size_t nodeId) {
 
     //     return false;
     // }
-    if (!(GTEST_OUT_NE(ret, 0))) {
+    if (!(GTEST_OUT_EQ(ret, 0))) {
         // EXPECT_NE(ret, 0);
         return false;
     }
