@@ -70,6 +70,7 @@ static inline bool UT_LOG_ERR(const char *format, ...) {
                       #rhs, (unsigned long long)(lhs),                         \
                       (unsigned long long)(rhs)),                              \
              0)))
+             
 // Assert a condition is true at runtime
 #define UT_ASSERT(cnd)                                                         \
     ((void)((cnd) || (UT_FATAL("%s:%d %s - assertion failure: %s", __FILE__,   \

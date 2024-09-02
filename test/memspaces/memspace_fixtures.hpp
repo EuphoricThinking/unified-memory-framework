@@ -66,19 +66,12 @@ struct memspaceGetTest : ::numaNodesTest,
         auto [isQuerySupported, memspaceGet] = this->GetParam();
 
         if (!isQuerySupported(nodeIds.front())) {
-            // GTEST_SKIP() << "Skipping 1";
-            GTEST_FAIL() << "Intended failure from query";
+            GTEST_FAIL();
         }
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
     }
-
-    // public:
-    // static void SetUpTestSuite() {
-    //     //ASSERT_TRUE(false) << "YOU SHALL NOT PASS";
-    //     GTEST_SKIP() << "SKIP ME BABY";
-    // }
 
     umf_const_memspace_handle_t hMemspace = nullptr;
 };
@@ -87,15 +80,15 @@ struct memspaceProviderTest : ::memspaceGetTest {
     void SetUp() override {
         ::memspaceGetTest::SetUp();
 
-        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
-        bool restinpiss = isQuerySupported(nodeIds.front());
-
-        if (!restinpiss || numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
-            GTEST_SKIP() << "Dkippig 2222";
+        if (numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
+            GTEST_SKIP();
         }
-        // if (::memspaceGetTest::IsSkipped()) {
-        //     GTEST_SKIP() << "SIPPING I WAS WROOONG";
-        // }
+
+        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
+
+        if (!isQuerySupported(nodeIds.front())) {
+            GTEST_FAIL();
+        }
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
