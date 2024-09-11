@@ -34,6 +34,8 @@ umf_result_t umfPoolCreateFromMemspace(umf_const_memspace_handle_t hMemspace,
                                        umf_const_mempolicy_handle_t hPolicy,
                                        umf_memory_pool_handle_t *hPool);
 
+void freeme(umf_const_memspace_handle_t memspace);
+
 ///
 /// \brief Creates new memory provider from memspace and policy.
 /// \param hMemspace handle to memspace

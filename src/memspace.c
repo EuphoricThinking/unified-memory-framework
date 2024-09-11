@@ -77,6 +77,14 @@ umf_result_t umfPoolCreateFromMemspace(umf_const_memspace_handle_t memspace,
     return ret;
 }
 
+void freeme(umf_const_memspace_handle_t memspace) {
+    void **privs = NULL;
+    umf_result_t ret = memoryTargetHandlesToPriv(memspace, &privs);
+    // if (ret != UMF_RESULT_SUCCESS) {
+    //     return ret;
+    // }
+    umf_ba_global_free(privs);
+}
 umf_result_t
 umfMemoryProviderCreateFromMemspace(umf_const_memspace_handle_t memspace,
                                     umf_const_mempolicy_handle_t policy,

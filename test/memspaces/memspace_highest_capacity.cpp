@@ -9,6 +9,8 @@
 #include "numa_helpers.hpp"
 #include "test_helpers.h"
 
+#include "base_alloc_global.h"
+
 #include <numa.h>
 #include <numaif.h>
 #include <umf/memspace.h>
@@ -22,7 +24,20 @@ struct memspaceHighestCapacityProviderTest : ::numaNodesTest {
 
         umf_const_memspace_handle_t hMemspace = umfMemspaceHighestCapacityGet();
         // UT_ASSERTne(hMemspace, nullptr);
-        ASSERT_NE(hMemspace, nullptr);  // **SEGFAULT** EQ
+        //ASSERT_TRUE(false);  // **SEGFAULT**
+        //ASSERT_NE(hMemspace, nullptr);  // **SEGFAULT** EQ
+        if (!(GTEST_OUT_EQ(hMemspace, nullptr))) {
+            std::cerr << "Here" << std::endl;
+            // umf_ba_global_free(hMemspace);
+    //         void **privs = NULL;
+    // umf_result_t ret = memoryTargetHandlesToPriv(hMemspace, &privs);
+            //umf_ba_global_free((void*)hMemspace); //privs);
+            //freeme(hMemspace);
+            umf_result_t ret =
+            umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
+            ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
+            GTEST_FAIL() << "HERE";
+        }
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
