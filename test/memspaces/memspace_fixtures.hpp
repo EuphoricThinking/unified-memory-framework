@@ -54,6 +54,17 @@ using isQuerySupportedFunc = assert_res (*)(size_t);
 using memspaceGetFunc = umf_const_memspace_handle_t (*)();
 using memspaceGetParams = std::tuple<isQuerySupportedFunc, memspaceGetFunc>;
 
+
+void helper(assert_res (*isQuerySupported) (size_t), size_t nodeIdsFront) {
+    assert_res queryCheck = isQuerySupported(nodeIdsFront);
+        if (queryCheck == SKIP_RES) {
+            GTEST_SKIP() << "bitch2";
+        }
+        else if (queryCheck == FATAL_RES) {
+            GTEST_FAIL() << "fail bitch2";
+        }
+}
+
 struct memspaceGetTest : ::numaNodesTest,
                          ::testing::WithParamInterface<memspaceGetParams> {
     void SetUp() override {
@@ -68,13 +79,15 @@ struct memspaceGetTest : ::numaNodesTest,
         // if (!isQuerySupported(nodeIds.front())) {
         //     GTEST_FAIL();
         // }
-        assert_res queryCheck = isQuerySupported(nodeIds.front());
-        if (queryCheck == SKIP_RES) {
-            GTEST_SKIP() << "bitch2";
-        }
-        else if (queryCheck == FATAL_RES) {
-            GTEST_FAIL() << "fail bitch2";
-        }
+
+        // assert_res queryCheck = isQuerySupported(nodeIds.front());
+        // if (queryCheck == SKIP_RES) {
+        //     GTEST_SKIP() << "bitch2";
+        // }
+        // else if (queryCheck == FATAL_RES) {
+        //     GTEST_FAIL() << "fail bitch2";
+        // }
+        helper(isQuerySupported, nodeIds.front());
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
@@ -96,13 +109,15 @@ struct memspaceProviderTest : ::memspaceGetTest {
         // if (!isQuerySupported(nodeIds.front())) {
         //     GTEST_FAIL();
         // }
-         assert_res queryCheck = isQuerySupported(nodeIds.front());
-        if (queryCheck == SKIP_RES) {
-            GTEST_SKIP() << "BITCH";
-        }
-        else if (queryCheck == FATAL_RES) {
-            GTEST_FAIL() << "FAIL BITCH";
-        }
+        //  assert_res queryCheck = isQuerySupported(nodeIds.front());
+        // if (queryCheck == SKIP_RES) {
+        //     GTEST_SKIP() << "BITCH";
+        // }
+        // else if (queryCheck == FATAL_RES) {
+        //     GTEST_FAIL() << "FAIL BITCH";
+        // }
+
+        helper(isQuerySupported, nodeIds.front());
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
