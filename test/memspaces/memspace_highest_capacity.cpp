@@ -60,7 +60,7 @@ TEST_F(memspaceHighestCapacityProviderTest, highestCapacityVerify) {
     memset(ptr, 0, alloc_size);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
-    int nodeId;
+    int nodeId = 0;
 
     ASSERT_NO_FATAL_FAILURE(getNumaNodeByPtr(ptr, &nodeId));
 

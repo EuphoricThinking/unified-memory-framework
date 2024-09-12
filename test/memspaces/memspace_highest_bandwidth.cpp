@@ -9,25 +9,25 @@
 #include "memspace_internal.h"
 #include "test_helpers.h"
 
-static bool canQueryBandwidth(size_t nodeId) {
+static assert_res canQueryBandwidth(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
 
     if (!GTEST_OUT_EQ(ret, 0)) {
-        return false;
+        return FATAL_RES;
     }
 
     ret = hwloc_topology_load(topology);
 
     if (!GTEST_OUT_EQ(ret, 0)) {
-        return false;
+        return FATAL_RES;
     }
 
     hwloc_obj_t numaNode =
         hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, nodeId);
 
     if (!GTEST_OUT_NE(numaNode, nullptr)) {
-        return false;
+        return FATAL_RES;
     }
 
     // Setup initiator structure.
@@ -42,9 +42,9 @@ static bool canQueryBandwidth(size_t nodeId) {
     hwloc_topology_destroy(topology);
 
     if (!GTEST_OUT_EQ(ret, 0)) {
-        return false;
+        return SKIP_RES;
     } else {
-        return true;
+        return SUCCESS_RES;
     }
 }
 
