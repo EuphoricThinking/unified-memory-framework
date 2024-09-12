@@ -55,15 +55,15 @@ using memspaceGetFunc = umf_const_memspace_handle_t (*)();
 using memspaceGetParams = std::tuple<isQuerySupportedFunc, memspaceGetFunc>;
 
 
-void helper(assert_res (*isQuerySupported) (size_t), size_t nodeIdsFront) {
-    assert_res queryCheck = isQuerySupported(nodeIdsFront);
-        if (queryCheck == SKIP_RES) {
-            GTEST_SKIP() << "bitch2";
-        }
-        else if (queryCheck == FATAL_RES) {
-            GTEST_FAIL() << "fail bitch2";
-        }
-}
+// void helper(assert_res (*isQuerySupported) (size_t), size_t nodeIdsFront) {
+//     assert_res queryCheck = isQuerySupported(nodeIdsFront);
+//         if (queryCheck == SKIP_RES) {
+//             GTEST_SKIP() << "bitch2";
+//         }
+//         else if (queryCheck == FATAL_RES) {
+//             GTEST_FAIL() << "fail bitch2";
+//         }
+// }
 
 struct memspaceGetTest : ::numaNodesTest,
                          ::testing::WithParamInterface<memspaceGetParams> {
@@ -87,11 +87,21 @@ struct memspaceGetTest : ::numaNodesTest,
         // else if (queryCheck == FATAL_RES) {
         //     GTEST_FAIL() << "fail bitch2";
         // }
-        helper(isQuerySupported, nodeIds.front());
+        helper(isQuerySupported); //, nodeIds.front());
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
     }
+
+    void helper(assert_res (*isQuerySupported) (size_t)) {
+    assert_res queryCheck = isQuerySupported(nodeIds.front());
+        if (queryCheck == SKIP_RES) {
+            GTEST_SKIP() << "bitch2";
+        }
+        else if (queryCheck == FATAL_RES) {
+            GTEST_FAIL() << "fail bitch2";
+        }
+}
 
     umf_const_memspace_handle_t hMemspace = nullptr;
 };
@@ -117,7 +127,7 @@ struct memspaceProviderTest : ::memspaceGetTest {
         //     GTEST_FAIL() << "FAIL BITCH";
         // }
 
-        helper(isQuerySupported, nodeIds.front());
+        helper(isQuerySupported); //, nodeIds.front());
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
