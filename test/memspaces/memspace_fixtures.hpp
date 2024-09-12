@@ -87,13 +87,13 @@ struct memspaceGetTest : ::numaNodesTest,
         // else if (queryCheck == FATAL_RES) {
         //     GTEST_FAIL() << "fail bitch2";
         // }
-        helper(isQuerySupported); //, nodeIds.front());
+        assertQueryResult(isQuerySupported); //, nodeIds.front());
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
     }
 
-    void helper(assert_res (*isQuerySupported) (size_t)) {
+    void assertQueryResult(assert_res (*isQuerySupported) (size_t)) {
     assert_res queryCheck = isQuerySupported(nodeIds.front());
         if (queryCheck == SKIP_RES) {
             GTEST_SKIP() << "bitch2";
@@ -127,7 +127,7 @@ struct memspaceProviderTest : ::memspaceGetTest {
         //     GTEST_FAIL() << "FAIL BITCH";
         // }
 
-        helper(isQuerySupported); //, nodeIds.front());
+        assertQueryResult(isQuerySupported); //, nodeIds.front());
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
