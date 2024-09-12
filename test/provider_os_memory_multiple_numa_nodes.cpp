@@ -98,17 +98,17 @@ struct testNuma : testing::Test {
     std::pair<int, bitmask *> retrieve_nodemask(void *addr) {
         struct bitmask *retrieved_nodemask = numa_allocate_nodemask();
 
-        if (nodemask == nullptr){
+        if (nodemask == nullptr) {
             return std::make_pair(__LINE__, nodemask);
         }
-        
+
         int ret = get_mempolicy(nullptr, retrieved_nodemask->maskp,
                                 nodemask->size, addr, MPOL_F_ADDR);
 
         if (ret != 0) {
             return std::make_pair(__LINE__, retrieved_nodemask);
         }
-        
+
         return std::pair(0, retrieved_nodemask);
     }
 
@@ -263,10 +263,10 @@ struct testNumaOnEachCpu : testNuma, testing::WithParamInterface<int> {
         int cpuNumber = this->GetParam();
 
         if (cpuNumber < 0) {
-            GTEST_FAIL() << "ret is not equal to 0 in " << __FILE__ << ": " << -cpuNumber;
+            GTEST_FAIL() << "ret is not equal to 0 in " << __FILE__ << ": "
+                         << -cpuNumber;
         }
     }
-
 };
 
 INSTANTIATE_TEST_SUITE_P(testNumaNodesAllocationsAllCpus, testNumaOnEachCpu,
@@ -302,7 +302,6 @@ TEST_P(testNumaOnEachCpu, checkModePreferredEmptyNodeset) {
     // Verify we're on the expected CPU
     int cpu_check = sched_getcpu();
     ASSERT_EQ(cpu, cpu_check);
-    
 
     int numa_node_number = numa_node_of_cpu(cpu);
     printf("Got CPU: %d, got numa node: %d\n", cpu, numa_node_number);
@@ -419,13 +418,14 @@ TEST_F(testNuma, checkModeInterleave) {
     }
 
     // bitmask *retrieved_nodemask = retrieve_nodemask(ptr);
-    auto[fileLine, retrieved_nodemask] =  retrieve_nodemask(ptr);
+    auto [fileLine, retrieved_nodemask] = retrieve_nodemask(ptr);
     if (fileLine != 0) {
         if (retrieved_nodemask == nullptr) {
-            GTEST_FAIL() << "retrieved_nodemask is nullptr " << __FILE__ << ": " << fileLine;
-        }
-        else {
-            GTEST_FAIL() << "ret is not equal to 0 " << __FILE__ << ": " << fileLine;
+            GTEST_FAIL() << "retrieved_nodemask is nullptr " << __FILE__ << ": "
+                         << fileLine;
+        } else {
+            GTEST_FAIL() << "ret is not equal to 0 " << __FILE__ << ": "
+                         << fileLine;
         }
     }
     int ret = numa_bitmask_equal(retrieved_nodemask, nodemask);
