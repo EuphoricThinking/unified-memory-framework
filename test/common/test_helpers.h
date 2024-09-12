@@ -22,6 +22,8 @@ extern "C" {
 // Needed for CI
 #define TEST_SKIP_ERROR_CODE 125
 
+enum assert_res {FATAL_RES, SKIP_RES, SUCCESS_RES};
+
 static inline void UT_FATAL(const char *format, ...) {
     va_list args_list;
     va_start(args_list, format);
