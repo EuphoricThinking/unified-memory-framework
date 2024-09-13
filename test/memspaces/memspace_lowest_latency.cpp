@@ -48,11 +48,10 @@ static void canQueryLatency(size_t nodeId) {
 
     hwloc_topology_destroy(topology);
 
-    if (!GTEST_OUT_EQ(ret, 0)) { 
+    if (!GTEST_OUT_EQ(ret, 0)) {
         // return SKIP_RES;
         GTEST_SKIP() << "skiplat3";
-    }
-    else {
+    } else {
         return;
     }
 }

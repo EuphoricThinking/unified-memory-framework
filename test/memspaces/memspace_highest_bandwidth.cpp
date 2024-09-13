@@ -13,7 +13,7 @@ static void canQueryBandwidth(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
 
-    if (!GTEST_OUT_EQ(ret, 0)){ // EQ
+    if (!GTEST_OUT_EQ(ret, 0)) { // EQ
         // return FATAL_RES;
         GTEST_FAIL() << "SISI";
     }
@@ -28,7 +28,7 @@ static void canQueryBandwidth(size_t nodeId) {
     hwloc_obj_t numaNode =
         hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, nodeId);
 
-    if (!GTEST_OUT_NE(numaNode, nullptr)){
+    if (!GTEST_OUT_NE(numaNode, nullptr)) {
         // return FATAL_RES;
         GTEST_FAIL() << "dada";
     }
@@ -47,8 +47,7 @@ static void canQueryBandwidth(size_t nodeId) {
     if (!GTEST_OUT_EQ(ret, 0)) { // EQ
         // return SKIP_RES;
         GTEST_SKIP() << "fifif";
-    }
-    else {
+    } else {
         return;
     }
 }

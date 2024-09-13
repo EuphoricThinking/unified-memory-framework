@@ -54,7 +54,6 @@ using isQuerySupportedFunc = void (*)(size_t);
 using memspaceGetFunc = umf_const_memspace_handle_t (*)();
 using memspaceGetParams = std::tuple<isQuerySupportedFunc, memspaceGetFunc>;
 
-
 struct memspaceGetTest : ::numaNodesTest,
                          ::testing::WithParamInterface<memspaceGetParams> {
     void SetUp() override {
@@ -69,15 +68,13 @@ struct memspaceGetTest : ::numaNodesTest,
         isQuerySupported(nodeIds.front());
         if (::numaNodesTest::IsSkipped()) {
             GTEST_SKIP();
-        }
-        else if (::numaNodesTest::HasFatalFailure()) {
+        } else if (::numaNodesTest::HasFatalFailure()) {
             GTEST_FAIL();
         }
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
     }
-
 
     umf_const_memspace_handle_t hMemspace = nullptr;
 };
@@ -94,8 +91,7 @@ struct memspaceProviderTest : ::memspaceGetTest {
         isQuerySupported(nodeIds.front());
         if (::memspaceGetTest::IsSkipped()) {
             GTEST_SKIP();
-        }
-        else if (::memspaceGetTest::HasFatalFailure()) {
+        } else if (::memspaceGetTest::HasFatalFailure()) {
             GTEST_FAIL();
         }
 
