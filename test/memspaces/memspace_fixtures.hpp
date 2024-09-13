@@ -50,7 +50,7 @@ struct numaNodesTest : ::umf_test::test {
     unsigned long maxNodeId = 0;
 };
 
-using isQuerySupportedFunc = assert_res (*)(size_t);
+using isQuerySupportedFunc = void (*)(size_t);
 using memspaceGetFunc = umf_const_memspace_handle_t (*)();
 using memspaceGetParams = std::tuple<isQuerySupportedFunc, memspaceGetFunc>;
 
@@ -66,21 +66,18 @@ struct memspaceGetTest : ::numaNodesTest,
 
         auto [isQuerySupported, memspaceGet] = this->GetParam();
 
-        assertQueryResult(isQuerySupported); 
+        isQuerySupported(nodeIds.front());
+        if (::numaNodesTest::IsSkipped()) {
+            GTEST_SKIP();
+        }
+        else if (::numaNodesTest::HasFatalFailure()) {
+            GTEST_FAIL();
+        }
 
         hMemspace = memspaceGet();
         ASSERT_NE(hMemspace, nullptr);
     }
 
-    void assertQueryResult(assert_res (*isQuerySupported) (size_t)) {
-        assert_res queryCheck = isQuerySupported(nodeIds.front());
-        if (queryCheck == SKIP_RES) {
-            GTEST_SKIP();
-        }
-        else if (queryCheck == FATAL_RES) {
-            GTEST_FAIL();
-        }
-}
 
     umf_const_memspace_handle_t hMemspace = nullptr;
 };
@@ -93,9 +90,14 @@ struct memspaceProviderTest : ::memspaceGetTest {
             GTEST_SKIP();
         }
 
-        auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
-
-        assertQueryResult(isQuerySupported);
+        auto [isQuerySupported, memspaceGet] = this->GetParam();
+        isQuerySupported(nodeIds.front());
+        if (::memspaceGetTest::IsSkipped()) {
+            GTEST_SKIP();
+        }
+        else if (::memspaceGetTest::HasFatalFailure()) {
+            GTEST_FAIL();
+        }
 
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
