@@ -14,6 +14,12 @@
 
 #include <umf/providers/provider_os_memory.h>
 
+#define FAIL_SIZE 2
+#define FAIL_IDX1 0
+#define FAIL_IDX2 1
+#define LINE_IDX 0
+#define RET_IDX 2
+
 static umf_os_memory_provider_params_t UMF_OS_MEMORY_PROVIDER_PARAMS_TEST =
     umfOsMemoryProviderParamsDefault();
 
@@ -42,7 +48,18 @@ std::vector<int> get_available_cpus() {
     CPU_ZERO(mask);
 
     int ret = sched_getaffinity(0, sizeof(cpu_set_t), mask);
-    UT_ASSERTeq(ret, 0);
+    // UT_ASSERTeq(ret, 0);  ++HERE
+
+    if (ret != 0) {
+        available_cpus.insert(available_cpus.end(), {__LINE__, __LINE__, ret}); // iterating for loop, no repeating elements, now we know the file and error line
+        CPU_FREE(mask);
+
+        return available_cpus;
+    }
+
+    // ++END
+
+
     // Get all available cpus.
     printf("All CPUs: ");
     for (size_t i = 0; i < CPU_SETSIZE; ++i) {
@@ -241,7 +258,21 @@ TEST_P(testNumaOnEachNode, checkModeInterleaveSingleNode) {
     EXPECT_NODE_EQ(ptr, numa_node_number);
 }
 
-struct testNumaOnEachCpu : testNuma, testing::WithParamInterface<int> {};
+struct testNumaOnEachCpu : testNuma, testing::WithParamInterface<int> {
+
+// ++HERE
+void SetUp() override {
+    testNuma::SetUp();
+    
+    std::vector<int> cpus = this->GetParam();
+
+    if ((cpus.size() == FAIL_SIZE) && (cpus[FAIL_IDX1] == cpus[FAIL_IDX2])) {
+        GTEST_FAIL() << "Assertion failure in " << __FILE__ << " at " << cpus[LINE_IDX] << ": " << cpus[RET_IDX] " is not equal to 0"; 
+    }
+}
+
+// ++END
+};
 
 INSTANTIATE_TEST_SUITE_P(testNumaNodesAllocationsAllCpus, testNumaOnEachCpu,
                          ::testing::ValuesIn(get_available_cpus()));
