@@ -105,14 +105,37 @@ struct testNuma : testing::Test {
         ASSERT_NE(os_memory_provider, nullptr);
     }
 
-    struct bitmask *retrieve_nodemask(void *addr) {
+// ++HERE
+    // struct bitmask *retrieve_nodemask(void *addr) {
+    //     struct bitmask *retrieved_nodemask = numa_allocate_nodemask();
+    //     UT_ASSERTne(nodemask, nullptr);
+    //     int ret = get_mempolicy(nullptr, retrieved_nodemask->maskp,
+    //                             nodemask->size, addr, MPOL_F_ADDR);
+    //     UT_ASSERTeq(ret, 0);
+    //     return retrieved_nodemask;
+    // }
+
+    std::pair<int, bitmask *> retrieve_nodemask(void *addr) {
         struct bitmask *retrieved_nodemask = numa_allocate_nodemask();
-        UT_ASSERTne(nodemask, nullptr);
+        // UT_ASSERTne(nodemask, nullptr);
+        if (nodemask == nullptr) {
+            return std::make_pair(__LINE__, nodemask); //is_null
+        }
         int ret = get_mempolicy(nullptr, retrieved_nodemask->maskp,
                                 nodemask->size, addr, MPOL_F_ADDR);
-        UT_ASSERTeq(ret, 0);
-        return retrieved_nodemask;
+        // UT_ASSERTeq(ret, 0);
+        if (ret != 0) {
+            return std::make_pair(__LINE__, (bitmask *) ret);//nodemask);
+        }
+        else {
+            return std::make_pair(0, nodemask);
+        }
+        // return retrieved_nodemask;
     }
+
+
+
+// ++END
 
     void TearDown() override {
         umf_result_t umf_result;
@@ -263,7 +286,7 @@ struct testNumaOnEachCpu : testNuma, testing::WithParamInterface<int> {
 // ++HERE
 void SetUp() override {
     testNuma::SetUp();
-    
+
     std::vector<int> cpus = this->GetParam();
 
     if ((cpus.size() == FAIL_SIZE) && (cpus[FAIL_IDX1] == cpus[FAIL_IDX2])) {
@@ -411,7 +434,19 @@ TEST_F(testNuma, checkModeInterleave) {
         EXPECT_NODE_EQ((char *)ptr + page_size * i, numa_nodes[index]);
     }
 
-    bitmask *retrieved_nodemask = retrieve_nodemask(ptr);
+
+// ++HERE
+    // bitmask *retrieved_nodemask = retrieve_nodemask(ptr);
+auto[line_res, retrieved_nodemask] = retrieve_nodemask(ptr);
+    if (line_res) {
+        if (retrieved_nodemask == nullptr) {
+            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res << ": nodemask is nullptr";
+        }
+        else {
+            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res << ": " << (int) nodemask << " is not 0";
+        }
+    }
+// ++END    
     int ret = numa_bitmask_equal(retrieved_nodemask, nodemask);
     numa_bitmask_free(retrieved_nodemask);
 
