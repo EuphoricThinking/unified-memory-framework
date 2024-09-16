@@ -29,12 +29,12 @@ struct memspaceHighestCapacityProviderTest : ::numaNodesTest {
         if (!(GTEST_OUT_EQ(hMemspace, nullptr))) {
             std::cerr << "Here" << std::endl;
             // umf_ba_global_free(hMemspace);
-    //         void **privs = NULL;
-    // umf_result_t ret = memoryTargetHandlesToPriv(hMemspace, &privs);
+            //         void **privs = NULL;
+            // umf_result_t ret = memoryTargetHandlesToPriv(hMemspace, &privs);
             //umf_ba_global_free((void*)hMemspace); //privs);
             //freeme(hMemspace);
-            umf_result_t ret =
-            umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
+            umf_result_t ret = umfMemoryProviderCreateFromMemspace(
+                hMemspace, nullptr, &hProvider);
             ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
             GTEST_FAIL() << "HERE";
         }
@@ -42,7 +42,7 @@ struct memspaceHighestCapacityProviderTest : ::numaNodesTest {
         umf_result_t ret =
             umfMemoryProviderCreateFromMemspace(hMemspace, nullptr, &hProvider);
         ASSERT_EQ(ret, UMF_RESULT_SUCCESS); // *Failed* when NE
-        ASSERT_NE(hProvider, nullptr); // *Failed* when EQ
+        ASSERT_NE(hProvider, nullptr);      // *Failed* when EQ
     }
 
     void TearDown() override {

@@ -47,8 +47,7 @@ static bool canQueryLatency(size_t nodeId) {
 
     if (!GTEST_OUT_EQ(ret, 0)) {
         return false;
-    }
-    else {
+    } else {
         return true;
     }
 }

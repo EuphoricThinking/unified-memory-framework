@@ -51,14 +51,16 @@ std::vector<int> get_available_cpus() {
     // UT_ASSERTeq(ret, 0);  ++HERE
 
     if (ret != 0) {
-        available_cpus.insert(available_cpus.end(), {__LINE__, __LINE__, ret}); // iterating for loop, no repeating elements, now we know the file and error line
+        available_cpus.insert(
+            available_cpus.end(),
+            {__LINE__, __LINE__,
+             ret}); // iterating for loop, no repeating elements, now we know the file and error line
         CPU_FREE(mask);
 
         return available_cpus;
     }
 
     // ++END
-
 
     // Get all available cpus.
     printf("All CPUs: ");
@@ -105,7 +107,7 @@ struct testNuma : testing::Test {
         ASSERT_NE(os_memory_provider, nullptr);
     }
 
-// ++HERE
+    // ++HERE
     // struct bitmask *retrieve_nodemask(void *addr) {
     //     struct bitmask *retrieved_nodemask = numa_allocate_nodemask();
     //     UT_ASSERTne(nodemask, nullptr);
@@ -125,17 +127,14 @@ struct testNuma : testing::Test {
                                 nodemask->size, addr, MPOL_F_ADDR);
         // UT_ASSERTeq(ret, 0);
         if (ret != 0) {
-            return std::make_pair(__LINE__, (bitmask *) ret);//nodemask);
-        }
-        else {
+            return std::make_pair(__LINE__, (bitmask *)ret); //nodemask);
+        } else {
             return std::make_pair(0, nodemask);
         }
         // return retrieved_nodemask;
     }
 
-
-
-// ++END
+    // ++END
 
     void TearDown() override {
         umf_result_t umf_result;
@@ -283,18 +282,21 @@ TEST_P(testNumaOnEachNode, checkModeInterleaveSingleNode) {
 
 struct testNumaOnEachCpu : testNuma, testing::WithParamInterface<int> {
 
-// ++HERE
-void SetUp() override {
-    testNuma::SetUp();
+    // ++HERE
+    void SetUp() override {
+        testNuma::SetUp();
 
-    std::vector<int> cpus = this->GetParam();
+        std::vector<int> cpus = this->GetParam();
 
-    if ((cpus.size() == FAIL_SIZE) && (cpus[FAIL_IDX1] == cpus[FAIL_IDX2])) {
-        GTEST_FAIL() << "Assertion failure in " << __FILE__ << " at " << cpus[LINE_IDX] << ": " << cpus[RET_IDX] " is not equal to 0"; 
+        if ((cpus.size() == FAIL_SIZE) &&
+            (cpus[FAIL_IDX1] == cpus[FAIL_IDX2])) {
+            GTEST_FAIL() << "Assertion failure in " << __FILE__ << " at "
+                         << cpus[LINE_IDX] << ": "
+                         << cpus[RET_IDX] " is not equal to 0";
+        }
     }
-}
 
-// ++END
+    // ++END
 };
 
 INSTANTIATE_TEST_SUITE_P(testNumaNodesAllocationsAllCpus, testNumaOnEachCpu,
@@ -434,19 +436,19 @@ TEST_F(testNuma, checkModeInterleave) {
         EXPECT_NODE_EQ((char *)ptr + page_size * i, numa_nodes[index]);
     }
 
-
-// ++HERE
+    // ++HERE
     // bitmask *retrieved_nodemask = retrieve_nodemask(ptr);
-auto[line_res, retrieved_nodemask] = retrieve_nodemask(ptr);
+    auto [line_res, retrieved_nodemask] = retrieve_nodemask(ptr);
     if (line_res) {
         if (retrieved_nodemask == nullptr) {
-            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res << ": nodemask is nullptr";
-        }
-        else {
-            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res << ": " << (int) nodemask << " is not 0";
+            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res
+                   << ": nodemask is nullptr";
+        } else {
+            FAIL() << "Assertion failure in " << __FILE__ << " at " << line_res
+                   << ": " << (int)nodemask << " is not 0";
         }
     }
-// ++END    
+    // ++END
     int ret = numa_bitmask_equal(retrieved_nodemask, nodemask);
     numa_bitmask_free(retrieved_nodemask);
 

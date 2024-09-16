@@ -116,7 +116,8 @@ TEST_P(umfLevelZeroProviderTest, basic) {
     ASSERT_NE(ptr, nullptr);
 
     // use the allocated memory - fill it with a 0xAB pattern
-    memAccessor->fill(ptr, size, &pattern, sizeof(pattern));
+    ASSERT_NO_FATAL_FAILURE(
+        memAccessor->fill(ptr, size, &pattern, sizeof(pattern)));
 
     ze_memory_type_t zeMemoryTypeActual = get_mem_type(hContext, ptr);
     ASSERT_EQ(zeMemoryTypeActual, zeMemoryTypeExpected);
