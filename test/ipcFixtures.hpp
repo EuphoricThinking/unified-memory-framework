@@ -31,7 +31,7 @@ class HostMemoryAccessor : public MemoryAccessor {
     void fill(void *ptr, size_t size, const void *pattern,
               size_t pattern_size) override {
         // assert(ptr != nullptr);
-        ASSERT_NE(ptr, nullptr);
+        ASSERT_EQ(ptr, nullptr);
         assert(pattern != nullptr);
         assert(pattern_size > 0);
         while (size) {
