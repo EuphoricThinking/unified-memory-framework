@@ -627,6 +627,9 @@ int create_context(ze_driver_handle_t driver, ze_context_handle_t *context) {
 }
 
 int destroy_context(ze_context_handle_t context) {
+    if (!context) {
+        return -1;
+    }
     ze_result_t ze_result;
     ze_result = libze_ops.zeContextDestroy(context);
     if (ze_result != ZE_RESULT_SUCCESS) {

@@ -172,10 +172,10 @@ struct umfLevelZeroProviderTest
     }
 
     void TearDown() override {
-        if (hContext) {
-            int ret = destroy_context(hContext);
-            ASSERT_EQ(ret, 0);
-        }
+        // if (hContext) {
+        int ret = destroy_context(hContext);
+        ASSERT_EQ(ret, 0);
+        // }
         test::TearDown();
     }
 
