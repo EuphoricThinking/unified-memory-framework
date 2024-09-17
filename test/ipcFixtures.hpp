@@ -57,7 +57,7 @@ struct umfIpcTest : umf_test::test,
 
     void TearDown() override { test::TearDown(); }
 
-    umf::pool_unique_handle_t makePool() {
+    void makePool(umf::pool_unique_handle_t* uniqueHandle) {
         // TODO: The function is similar to poolCreateExt function
         //       from memoryPool.hpp
         umf_memory_provider_handle_t hProvider;
@@ -67,7 +67,11 @@ struct umfIpcTest : umf_test::test,
 
         auto ret =
             umfMemoryProviderCreate(provider_ops, provider_params, &hProvider);
-        EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
+        ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
+        // if (ret != UMF_RESULT_SUCCESS) 
+        // if (testing::Test::HasFailure()) {
+        //     return;
+        // }
 
         auto trace = [](void *trace_context, const char *name) {
             stats_type *stat = static_cast<stats_type *>(trace_context);
@@ -93,7 +97,8 @@ struct umfIpcTest : umf_test::test,
 
         memAccessor = accessor;
 
-        return umf::pool_unique_handle_t(hPool, &umfPoolDestroy);
+        // return umf::pool_unique_handle_t(hPool, &umfPoolDestroy);
+        *uniqueHandle = umf::pool_unique_handle_t(hPool, &umfPoolDestroy);
     }
 
     struct stats_type {
@@ -115,7 +120,9 @@ struct umfIpcTest : umf_test::test,
 
 TEST_P(umfIpcTest, GetIPCHandleSize) {
     size_t size = 0;
-    umf::pool_unique_handle_t pool = makePool();
+    // umf::pool_unique_handle_t pool = makePool();
+    umf::pool_unique_handle_t pool;
+    ASSERT_NO_FATAL_FAILURE( makePool(&pool));
 
     umf_result_t ret = umfPoolGetIPCHandleSize(pool.get(), &size);
     EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
@@ -133,7 +140,10 @@ TEST_P(umfIpcTest, GetIPCHandleInvalidArgs) {
     ret = umfGetIPCHandle(ptr, &ipcHandle, &handleSize);
     EXPECT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
-    umf::pool_unique_handle_t pool = makePool();
+    // umf::pool_unique_handle_t pool = makePool();
+    umf::pool_unique_handle_t pool;
+    ASSERT_NO_FATAL_FAILURE( makePool(&pool));
+
     ptr = umfPoolMalloc(pool.get(), SIZE);
     EXPECT_NE(ptr, nullptr);
 
@@ -150,7 +160,10 @@ TEST_P(umfIpcTest, GetIPCHandleInvalidArgs) {
 TEST_P(umfIpcTest, BasicFlow) {
     constexpr size_t SIZE = 100;
     std::vector<int> expected_data(SIZE);
-    umf::pool_unique_handle_t pool = makePool();
+    // umf::pool_unique_handle_t pool = makePool();
+    umf::pool_unique_handle_t pool;
+    ASSERT_NO_FATAL_FAILURE( makePool(&pool));
+
     int *ptr = (int *)umfPoolMalloc(pool.get(), SIZE * sizeof(int));
     EXPECT_NE(ptr, nullptr);
 
@@ -213,7 +226,9 @@ TEST_P(umfIpcTest, ConcurrentGetPutHandles) {
     std::vector<void *> ptrs;
     constexpr size_t ALLOC_SIZE = 100;
     constexpr size_t NUM_POINTERS = 100;
-    umf::pool_unique_handle_t pool = makePool();
+    // umf::pool_unique_handle_t pool = makePool();
+    umf::pool_unique_handle_t pool;
+    ASSERT_NO_FATAL_FAILURE( makePool(&pool));
 
     for (size_t i = 0; i < NUM_POINTERS; ++i) {
         void *ptr = umfPoolMalloc(pool.get(), ALLOC_SIZE);
@@ -261,7 +276,9 @@ TEST_P(umfIpcTest, ConcurrentOpenCloseHandles) {
     std::vector<void *> ptrs;
     constexpr size_t ALLOC_SIZE = 100;
     constexpr size_t NUM_POINTERS = 100;
-    umf::pool_unique_handle_t pool = makePool();
+    // umf::pool_unique_handle_t pool = makePool();
+    umf::pool_unique_handle_t pool;
+    ASSERT_NO_FATAL_FAILURE( makePool(&pool));
 
     for (size_t i = 0; i < NUM_POINTERS; ++i) {
         void *ptr = umfPoolMalloc(pool.get(), ALLOC_SIZE);
