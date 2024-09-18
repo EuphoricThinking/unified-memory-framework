@@ -16,6 +16,8 @@
 #define SIZE_4K (4096UL)
 #define SIZE_4M (SIZE_4K * 1024UL)
 
+#define IS_SKIPPED_OR_FAILED() (HasFatalFailure() || IsSkipped())
+
 ///
 /// @brief Retrieves the memory policy information for \p ptr.
 /// @param ptr allocation pointer.
@@ -55,5 +57,6 @@ void getAllocationPolicy(void *ptr, unsigned long maxNodeId, int &mode,
     UT_ASSERTeq(ret, 0);
     allocNodeId = static_cast<size_t>(nodeId);
 }
+
 
 #endif /* UMF_TEST_MEMSPACE_HELPERS_HPP */
