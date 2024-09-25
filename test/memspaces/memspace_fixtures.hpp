@@ -83,7 +83,7 @@ struct memspaceProviderTest : ::memspaceGetTest {
         ::memspaceGetTest::SetUp();
 
         if (numa_available() == -1 || numa_all_nodes_ptr == nullptr) {
-            GTEST_SKIP();
+            GTEST_SKIP() << "No available NUMA support; skipped";
         }
 
         auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();

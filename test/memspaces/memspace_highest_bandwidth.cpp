@@ -12,16 +12,13 @@
 static void canQueryBandwidth(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
-
     ASSERT_EQ(ret, 0);
 
     ret = hwloc_topology_load(topology);
-
     ASSERT_EQ(ret, 0);
 
     hwloc_obj_t numaNode =
         hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, nodeId);
-
     ASSERT_NE(numaNode, nullptr);
 
     // Setup initiator structure.
