@@ -9,7 +9,6 @@ jobs:
     name: Performance regression check
     runs-on: ubuntu-latest
     steps:
-      steps:
       - uses: actions/checkout@v1
       - name: Run benchmark
         run: cat .github/workflows/testjson.json > output.txt
