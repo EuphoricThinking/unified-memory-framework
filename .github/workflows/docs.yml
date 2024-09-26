@@ -3,7 +3,7 @@ name: GitHubPages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "benchmark_test"]
 
 # Cancel previous in-progress workflow, only the latest run is relevant
 concurrency:
@@ -14,8 +14,52 @@ permissions:
   contents: read
 
 jobs:
+  benchmark:
+    name: Performance regression check
+    permissions:
+      # deployments permission to deploy GitHub pages website
+      deployments: write
+      # contents permission to update benchmark contents in gh-pages branch
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Run benchmark
+        run: cat .github/workflows/testjson.json > output.txt
+      # Run `github-action-benchmark` action
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: My Project Benchmark
+          # What benchmark tool the output.txt came from // customs have too //
+          tool: 'customSmallerIsBetter'
+          # Where the output from the benchmark tool is stored
+          output-file-path: output.txt
+          # Workflow will fail when an alert happens
+          fail-on-alert: true
+          # Access token to deploy GitHub Pages branch
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Push and deploy GitHub pages branch automatically
+          auto-push: true
+
+          gh-pages-branch: "benchmark_test"
+      # Upload the updated cache file for the next job by actions/cache
+      
+      - name: Checkout benchmark_test
+        uses: actions/checkout@v4
+        with:
+          ref: "benchmark_test"
+
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchie
+          path: dev/bench
+
   build:
     name: Build docs
+    needs: benchmark
     runs-on: ${{ github.repository_owner == 'oneapi-src' && 'intel-ubuntu-22.04' || 'ubuntu-latest' }}
 
     steps:
@@ -40,9 +84,27 @@ jobs:
     - name: Setup PATH for python
       run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+    - name: Show before download
+      run: ls
+
+    - name: Download benchmark result
+      uses: actions/download-artifact@v4
+      with:
+        name: benchie
+
+    - name: Show downloaded
+      run: ls
+
     - name: Build the documentation
       working-directory: scripts
       run: python3 generate_docs.py
+
+    - name: Move benchmark files
+      run: mv index.html docs/html/index_benchmark.html && mv data.js docs/html
+
+    - name: List upload
+      working-directory: docs/html
+      run: ls
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
@@ -52,7 +114,7 @@ jobs:
   deploy:
     name: Deploy docs to GitHub Pages
     needs: build
-
+    
     permissions:
       pages: write
       id-token: write
