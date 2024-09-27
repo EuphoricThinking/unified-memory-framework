@@ -23,6 +23,7 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
+          name: My Project Benchmark
           # What benchmark tool the output.txt came from // customs have too
           tool: 'customSmallerIsBetter'
           # Where the output from the benchmark tool is stored
