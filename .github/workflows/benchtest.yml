@@ -4,6 +4,13 @@ on:
     branches:
       - benchmark_test
 
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
+
 jobs:
   benchmark:
     name: Performance regression check
@@ -22,4 +29,8 @@ jobs:
           output-file-path: output.txt
           # Workflow will fail when an alert happens
           fail-on-alert: true
+          # Access token to deploy GitHub Pages branch
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Push and deploy GitHub pages branch automatically
+          auto-push: true
       # Upload the updated cache file for the next job by actions/cache
