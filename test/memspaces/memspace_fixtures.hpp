@@ -89,6 +89,9 @@ struct memspaceProviderTest : ::memspaceGetTest {
         auto [isQuerySupported, memspaceGet] = ::memspaceGetTest::GetParam();
         isQuerySupported(nodeIds.front());
 
+        // The test has been marked as skipped in isQuerySupported,
+        // repeating GTEST_SKIP in fixture would only duplicate
+        // the output message
         if (IS_SKIPPED_OR_FAILED()) {
             return;
         }
