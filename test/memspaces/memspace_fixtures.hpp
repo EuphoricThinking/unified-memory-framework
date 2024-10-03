@@ -67,7 +67,6 @@ struct memspaceGetTest : ::numaNodesTest,
         isQuerySupported(nodeIds.front());
 
         if (IS_SKIPPED_OR_FAILED()) {
-            // teardown?
             return;
         }
 

@@ -33,10 +33,8 @@ static void canQueryLatency(size_t nodeId) {
 
     hwloc_topology_destroy(topology);
 
-    // changed
-    ret = -1;
     if (ret != 0) {
-        GTEST_SKIP() << "hwloc_memattr_get_value is equal to " << ret << ", should be " << 0 << "\nError message: " << strerror(errno);
+        GTEST_SKIP() << "Error: hwloc_memattr_get_value return value is equal to " << ret << ", should be " << 0;
     }
 }
 

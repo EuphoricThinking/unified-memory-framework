@@ -33,7 +33,7 @@ static void canQueryBandwidth(size_t nodeId) {
     hwloc_topology_destroy(topology);
 
     if (ret != 0) {
-        GTEST_SKIP() << "ret is equal to " << ret << ", should be " << 0;
+        GTEST_SKIP() << "Error: hwloc_memattr_get_value return value is equal to " << ret << ", should be " << 0;
     }
 }
 
