@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1728047937947,
+  "lastUpdate": 1728048415956,
   "repoUrl": "https://github.com/EuphoricThinking/unified-memory-framework",
   "entries": {
     "Benchmark": [
@@ -133,6 +133,42 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/7e443231688ba740be62d333ae11af21abfb4363"
         },
         "date": 1728047937299,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "My Custom Smaller Is Better Benchmark - CPU Load",
+            "value": 50,
+            "unit": "Percent"
+          },
+          {
+            "name": "My Custom Smaller Is Better Benchmark - Memory Used",
+            "value": 100,
+            "unit": "Megabytes",
+            "range": "3",
+            "extra": "Value for Tooltip: 25\nOptional Num #2: 100\nAnything Else!"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "committer": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "distinct": true,
+          "id": "d76a37850297042f9032ccd57de37a80c37f0508",
+          "message": "Updated environment in gh settings",
+          "timestamp": "2024-10-04T15:26:42+02:00",
+          "tree_id": "c0c9a7ec9cf95db21b93161caa303b0df588fbda",
+          "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/d76a37850297042f9032ccd57de37a80c37f0508"
+        },
+        "date": 1728048415747,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
