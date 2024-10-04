@@ -9,7 +9,6 @@
 #include "memspace_internal.h"
 #include "test_helpers.h"
 
-
 static void canQueryLatency(size_t nodeId) {
     hwloc_topology_t topology = nullptr;
     int ret = hwloc_topology_init(&topology);
@@ -34,7 +33,9 @@ static void canQueryLatency(size_t nodeId) {
     hwloc_topology_destroy(topology);
 
     if (ret != 0) {
-        GTEST_SKIP() << "Error: hwloc_memattr_get_value return value is equal to " << ret << ", should be " << 0;
+        GTEST_SKIP()
+            << "Error: hwloc_memattr_get_value return value is equal to " << ret
+            << ", should be " << 0;
     }
 }
 
