@@ -1,6 +1,7 @@
 name: Minimal setup
 on:
-  push:
+  # push:
+  pull:
     branches:
       - benchmark_test
 
