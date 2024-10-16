@@ -80,10 +80,10 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: benchie
-        # path: docs/html
+        #path: artif
 
     - name: Show UNextracted
-      # working-directory: docs/html
+      #working-directory: docs/html
       run: ls
 
     - name: Extract benchmark
@@ -99,9 +99,9 @@ jobs:
       run: python3 generate_docs.py
         #path: dev/bench
 
-    - name: Rename index.html
+    - name: Move benchmark files
       # working-directory: docs/html
-      run: mv index.html docs/html/index_benchmark.html
+      run: mv index.html docs/html/index_benchmark.html && mv data.js docs/html
 
     - name: List upload
       working-directory: docs/html
