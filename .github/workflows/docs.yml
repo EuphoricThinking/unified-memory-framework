@@ -80,28 +80,32 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: benchie
-        path: docs/html
+        # path: docs/html
 
     - name: Show UNextracted
-      working-directory: docs/html
+      # working-directory: docs/html
       run: ls
 
     - name: Extract benchmark
-      working-directory: docs/html
+      # working-directory: docs/html
       run: tar -xvf *.tar          #) && ls #mv index.html index_benchmark.html
 
     - name: Show extracted
-      working-directory: docs/html
+      # working-directory: docs/html
       run: ls
-
-    - name: Rename index.html
-      working-directory: docs/html
-      run: mv index.html index_benchmark.html
 
     - name: Build the documentation
       working-directory: scripts
       run: python3 generate_docs.py
         #path: dev/bench
+
+    - name: Rename index.html
+      # working-directory: docs/html
+      run: mv index.html docs/html/index_benchmark.html
+
+    - name: List upload
+      working-directory: docs/html
+      run: ls
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
