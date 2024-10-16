@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1728446416788,
+  "lastUpdate": 1729048346862,
   "repoUrl": "https://github.com/EuphoricThinking/unified-memory-framework",
   "entries": {
     "Benchmark": [
@@ -385,6 +385,42 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/baba790aced0e2527df94420e172e8b086c676a3"
         },
         "date": 1728446416584,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "My Custom Smaller Is Better Benchmark - CPU Load",
+            "value": 50,
+            "unit": "Percent"
+          },
+          {
+            "name": "My Custom Smaller Is Better Benchmark - Memory Used",
+            "value": 100,
+            "unit": "Megabytes",
+            "range": "3",
+            "extra": "Value for Tooltip: 25\nOptional Num #2: 100\nAnything Else!"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "committer": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "distinct": true,
+          "id": "e6168b701925020f09b17e2dc58cb5cfd6988e2c",
+          "message": "Indentation in permissions",
+          "timestamp": "2024-10-16T05:07:47+02:00",
+          "tree_id": "4b59d96461e7b6c346b9a7b2ac9dc88736eb072f",
+          "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/e6168b701925020f09b17e2dc58cb5cfd6988e2c"
+        },
+        "date": 1729048346622,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
