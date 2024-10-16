@@ -94,6 +94,10 @@ jobs:
       working-directory: docs/html
       run: ls
 
+    - name: Rename index.html
+      working-directory: docs/html
+      run: mv index.html index_benchmark.html
+
     - name: Build the documentation
       working-directory: scripts
       run: python3 generate_docs.py
