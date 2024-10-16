@@ -79,7 +79,7 @@ jobs:
     - name: Download benchmark result
       uses: actions/download-artifact@v4
       with:
-        name: dev/bench/benchie
+        name: benchie
         path: docs/html
 
     - name: Change index.html name
