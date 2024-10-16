@@ -82,6 +82,10 @@ jobs:
         name: benchie
         path: docs/html
 
+    - name: Show UNextracted
+      working-directory: docs/html
+      run: ls
+
     - name: Extract benchmark
       working-directory: docs/html
       run: ls | tar -xvf - #) && ls #mv index.html index_benchmark.html
