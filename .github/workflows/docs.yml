@@ -14,8 +14,49 @@ permissions:
   contents: read
 
 jobs:
+  benchmark:
+  name: Performance regression check
+  permissions:
+    # deployments permission to deploy GitHub pages website
+    deployments: write
+    # contents permission to update benchmark contents in gh-pages branch
+    contents: write
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v1
+    - name: Run benchmark
+      run: cat .github/workflows/testjson.json > output.txt
+    # Run `github-action-benchmark` action
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: My Project Benchmark
+        # What benchmark tool the output.txt came from // customs have too //
+        tool: 'customSmallerIsBetter'
+        # Where the output from the benchmark tool is stored
+        output-file-path: output.txt
+        # Workflow will fail when an alert happens
+        fail-on-alert: true
+        # Access token to deploy GitHub Pages branch
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        # Push and deploy GitHub pages branch automatically
+        auto-push: true
+    # Upload the updated cache file for the next job by actions/cache
+    
+    - name: Checkout gh-pages
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
+      with:
+        name: benchie
+        # path: dev/bench
+
   build:
     name: Build docs
+    needs: benchmark
     runs-on: ${{ github.repository_owner == 'oneapi-src' && 'intel-ubuntu-22.04' || 'ubuntu-latest' }}
 
     steps:
@@ -35,58 +76,29 @@ jobs:
     - name: Setup PATH for python
       run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+    - name: Download benchmark result
+      uses: actions/download-artifact@v4
+      with:
+        name: benchie
+        path: docs/html
+
+    - name: Change index.html name
+      working-directory: docs/html
+      run: mv index.html index_benchmark.html
+      
     - name: Build the documentation
       working-directory: scripts
       run: python3 generate_docs.py
+        #path: dev/bench
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
       with:
         path: docs/html
 
-  benchmark:
-    name: Performance regression check
-    permissions:
-      # deployments permission to deploy GitHub pages website
-      deployments: write
-      # contents permission to update benchmark contents in gh-pages branch
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Run benchmark
-        run: cat .github/workflows/testjson.json > output.txt
-      # Run `github-action-benchmark` action
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: My Project Benchmark
-          # What benchmark tool the output.txt came from // customs have too //
-          tool: 'customSmallerIsBetter'
-          # Where the output from the benchmark tool is stored
-          output-file-path: output.txt
-          # Workflow will fail when an alert happens
-          fail-on-alert: true
-          # Access token to deploy GitHub Pages branch
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # Push and deploy GitHub pages branch automatically
-          auto-push: true
-      # Upload the updated cache file for the next job by actions/cache
-      
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
-        with:
-          name: benchie
-          path: dev/bench
-
   deploy:
     name: Deploy docs to GitHub Pages
-    needs: [build, benchmark]
+    needs: build #[build, benchmark]
 
     permissions:
       pages: write
