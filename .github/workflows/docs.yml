@@ -84,7 +84,7 @@ jobs:
 
     - name: Change index.html name
       working-directory: docs/html
-      run: ls | tar -xvf && ls #mv index.html index_benchmark.html
+      run: {ls | tar -xvf;} && ls #mv index.html index_benchmark.html
 
     - name: Build the documentation
       working-directory: scripts
