@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
         with:
           name: benchie
-          # path: dev/bench
+          path: dev/bench
 
   build:
     name: Build docs
@@ -79,7 +79,7 @@ jobs:
     - name: Download benchmark result
       uses: actions/download-artifact@v4
       with:
-        name: benchie
+        name: dev/bench/benchie
         path: docs/html
 
     - name: Change index.html name
