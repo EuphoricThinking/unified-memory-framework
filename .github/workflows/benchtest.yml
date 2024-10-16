@@ -1,7 +1,7 @@
 name: Minimal setup
 on:
   # push:
-  pull:
+  pull_request:
     branches:
       - benchmark_test
 
