@@ -88,7 +88,7 @@ jobs:
 
     - name: Extract benchmark
       working-directory: docs/html
-      run: ls | tar -xvf - #) && ls #mv index.html index_benchmark.html
+      run: tar -xvf *.tar          #) && ls #mv index.html index_benchmark.html
 
     - name: Show extracted
       working-directory: docs/html
