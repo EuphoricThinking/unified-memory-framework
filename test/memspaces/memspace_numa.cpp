@@ -152,11 +152,9 @@ TEST_F(memspaceNumaTest, memspaceCopyTarget) {
     ASSERT_BIND_MODE_EQ(ptr1, ptr2);
 
     ret = umfMemoryProviderFree(hProvider1, ptr1, SIZE_4K);
-    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     ret = umfMemoryProviderFree(hProvider2, ptr2, SIZE_4K);
-    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     umfMemoryProviderDestroy(hProvider1);
@@ -213,11 +211,9 @@ TEST_F(memspaceNumaTest, memspaceDeleteTarget) {
     ASSERT_BIND_MODE_EQ(ptr1, ptr2);
 
     ret = umfMemoryProviderFree(hProvider1, ptr1, SIZE_4K);
-    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     ret = umfMemoryProviderFree(hProvider2, ptr2, SIZE_4K);
-    // UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     umfMemoryProviderDestroy(hProvider1);
