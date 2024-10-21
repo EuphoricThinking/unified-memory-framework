@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1729517589171,
+  "lastUpdate": 1729517728776,
   "repoUrl": "https://github.com/EuphoricThinking/unified-memory-framework",
   "entries": {
     "Benchmark": [
@@ -997,6 +997,42 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/d579f90b87cac7ddd4f32d47dec72d48b7688afc"
         },
         "date": 1729517588874,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "My Custom Smaller Is Better Benchmark - CPU Load",
+            "value": 50,
+            "unit": "Percent"
+          },
+          {
+            "name": "My Custom Smaller Is Better Benchmark - Memory Used",
+            "value": 100,
+            "unit": "Megabytes",
+            "range": "3",
+            "extra": "Value for Tooltip: 25\nOptional Num #2: 100\nAnything Else!"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "committer": {
+            "email": "agata.momot@intel.com",
+            "name": "Agata Momot",
+            "username": "EuphoricThinking"
+          },
+          "distinct": true,
+          "id": "380f5acda85534dda40a46f23ffed6bca04ba3ce",
+          "message": "Show before download",
+          "timestamp": "2024-10-21T15:35:16+02:00",
+          "tree_id": "6e215c61a1f6ccab1b72ec1b69bdeb9be199f354",
+          "url": "https://github.com/EuphoricThinking/unified-memory-framework/commit/380f5acda85534dda40a46f23ffed6bca04ba3ce"
+        },
+        "date": 1729517728151,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
