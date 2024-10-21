@@ -85,17 +85,17 @@ jobs:
         name: benchie
         #path: artif
 
-    - name: Show UNextracted
+    - name: Show downloaded
       #working-directory: docs/html
       run: ls
 
-    - name: Extract benchmark
-      # working-directory: docs/html
-      run: tar -xvf *.tar          #) && ls #mv index.html index_benchmark.html
+    # - name: Extract benchmark
+    #   # working-directory: docs/html
+    #   run: tar -xvf *.tar          #) && ls #mv index.html index_benchmark.html
 
-    - name: Show extracted
-      # working-directory: docs/html
-      run: ls
+    # - name: Show extracted
+    #   # working-directory: docs/html
+    #   run: ls
 
     - name: Build the documentation
       working-directory: scripts
