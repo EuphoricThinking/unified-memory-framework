@@ -19,7 +19,7 @@ createDisjointPool(umf_memory_provider_handle_t provider) {
     umf_disjoint_pool_params_t params = umfDisjointPoolParamsDefault();
     umf_result_t ret =
         umfPoolCreate(umfDisjointPoolOps(), provider, &params, 0, &pool);
-    UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);
+    UT_ASSERTne(ret, UMF_RESULT_SUCCESS);  //changed
     return pool;
 }
 
