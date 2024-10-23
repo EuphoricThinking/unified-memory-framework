@@ -12,6 +12,7 @@
 #include <umf/providers/provider_os_memory.h>
 
 #include "test_helpers.h"
+#include "ut_asserts.h"
 
 umf_memory_pool_handle_t
 createDisjointPool(umf_memory_provider_handle_t provider) {
@@ -19,7 +20,7 @@ createDisjointPool(umf_memory_provider_handle_t provider) {
     umf_disjoint_pool_params_t params = umfDisjointPoolParamsDefault();
     umf_result_t ret =
         umfPoolCreate(umfDisjointPoolOps(), provider, &params, 0, &pool);
-    UT_ASSERTne(ret, UMF_RESULT_SUCCESS);  //changed
+    UT_ASSERTeq(ret, UMF_RESULT_SUCCESS);  //changed to ne probably
     return pool;
 }
 
