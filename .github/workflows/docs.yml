@@ -40,7 +40,7 @@ jobs:
           # Access token to deploy GitHub Pages branch
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Push and deploy GitHub pages branch automatically
-          auto-push: true
+          # auto-push: true
       # Upload the updated cache file for the next job by actions/cache
       
       - name: Checkout gh-pages
