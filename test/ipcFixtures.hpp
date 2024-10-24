@@ -8,7 +8,7 @@
 #include "base.hpp"
 #include "multithread_helpers.hpp"
 #include "pool.hpp"
-// #include "test_helpers.h"
+#include "test_helpers.h"
 
 #include <umf/ipc.h>
 #include <umf/memory_pool.h>
