@@ -45,6 +45,10 @@ jobs:
           gh-pages-branch: "benchmark_test"
           # benchmark-data-dir-path: "docs/dev/bench"
 
+      - name: Show benchmarked
+        working-directory: dev/bench
+        run: ls
+
       # Upload the updated cache file for the next job by actions/cache
       
       # - name: Checkout gh-pages
