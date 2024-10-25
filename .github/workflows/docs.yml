@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-        with:
-          ref: "benchmark_test"
+        # with:
+        #   ref: "benchmark_test"
 
       - name: Run benchmark
         run: cat .github/workflows/testjson.json > output.txt
@@ -50,6 +50,16 @@ jobs:
 
 
       # Upload the updated cache file for the next job by actions/cache
+      - name: Show benchmarked before copy checkout
+        working-directory: dev/bench
+        run: ls
+
+      - name: Copy dir from branch
+        run: git checkout benchmark_test -- dev/bench
+
+      - name: Show benchmarked AFTER copy checkout
+        working-directory: dev/bench
+        run: ls
       
       # - name: Checkout gh-pages
       #   uses: actions/checkout@v4
@@ -72,7 +82,7 @@ jobs:
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         fetch-depth: 0
-        ref: "benchmark_test"
+        # ref: "benchmark_test"
 
     - name: Install doxygen
       run: |
@@ -98,20 +108,20 @@ jobs:
     #   #working-directory: docs/html
     #   run: ls
 
-    - name: Show benchmark in dev/bench
+    # - name: Show benchmark in dev/bench
+    #   working-directory: dev/bench
+    #   run: ls
+
+    - name: Show benchmarked before copy checkout
       working-directory: dev/bench
       run: ls
 
-    # - name: Show benchmarked before copy checkout
-    #   working-directory: dev/bench
-    #   run: ls
+    - name: Copy dir from branch
+      run: git checkout benchmark_test -- dev/bench
 
-    # - name: Copy dir from branch
-    #   run: git checkout benchmark_test -- dev/bench
-
-    # - name: Show benchmarked AFTER copy checkout
-    #   working-directory: dev/bench
-    #   run: ls
+    - name: Show benchmarked AFTER copy checkout
+      working-directory: dev/bench
+      run: ls
 
     # - name: Extract benchmark
     #   # working-directory: docs/html
