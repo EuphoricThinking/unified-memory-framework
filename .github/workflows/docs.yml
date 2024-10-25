@@ -97,7 +97,7 @@ jobs:
     #   #working-directory: docs/html
     #   run: ls
 
-    - name: Show benchmark
+    - name: Show benchmark in dev/bench
       working-directory: dev/bench
       run: ls
 
