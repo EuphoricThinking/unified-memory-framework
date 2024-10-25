@@ -41,18 +41,22 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Push and deploy GitHub pages branch automatically
           auto-push: true
+          
+          gh-pages-branch: "benchmark_test"
+          # benchmark-data-dir-path: "docs/dev/bench"
+
       # Upload the updated cache file for the next job by actions/cache
       
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
+      # - name: Checkout gh-pages
+      #   uses: actions/checkout@v4
+      #   with:
+      #     ref: gh-pages
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchie
-          path: dev/bench
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: benchie
+      #     path: docs/dev/bench
 
   build:
     name: Build docs
@@ -76,17 +80,21 @@ jobs:
     - name: Setup PATH for python
       run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    - name: Show before download
-      run: ls
+    # - name: Show before build #before download
+    #   run: ls
 
-    - name: Download benchmark result
-      uses: actions/download-artifact@v4
-      with:
-        name: benchie
+    # - name: Download benchmark result
+    #   uses: actions/download-artifact@v4
+    #   with:
+    #     name: benchie
         #path: artif
 
-    - name: Show downloaded
-      #working-directory: docs/html
+    # - name: Show downloaded
+    #   #working-directory: docs/html
+    #   run: ls
+
+    - name: Show benchmark
+      working-directory: dev/bench
       run: ls
 
     # - name: Extract benchmark
@@ -104,7 +112,7 @@ jobs:
 
     - name: Move benchmark files
       # working-directory: docs/html
-      run: mv index.html docs/html/index_benchmark.html && mv data.js docs/html
+      run: mv dev/bench/index.html docs/html/index_benchmark.html && mv dev/bench/data.js docs/html
 
     - name: List upload
       working-directory: docs/html
