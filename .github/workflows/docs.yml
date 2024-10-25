@@ -102,8 +102,8 @@ jobs:
     #   run: ls
 
     - name: Show benchmarked before copy checkout
-        working-directory: dev/bench
-        run: ls
+      working-directory: dev/bench
+      run: ls
 
     - name: Copy dir from branch
       run: git checkout benchmark_test -- dev/bench
