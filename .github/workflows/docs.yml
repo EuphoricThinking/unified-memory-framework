@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+        with:
+          # ref: "benchmark_test"
+
       - name: Run benchmark
         run: cat .github/workflows/testjson.json > output.txt
       # Run `github-action-benchmark` action
@@ -44,17 +47,6 @@ jobs:
           
           gh-pages-branch: "benchmark_test"
           # benchmark-data-dir-path: "docs/dev/bench"
-
-      - name: Show benchmarked before copy checkout
-        working-directory: dev/bench
-        run: ls
-
-      - name: Copy dir from branch
-        run: git checkout benchmark_test -- dev/bench
-
-      - name: Show benchmarked AFTER copy checkout
-        working-directory: dev/bench
-        run: ls
 
 
       # Upload the updated cache file for the next job by actions/cache
@@ -105,7 +97,18 @@ jobs:
     #   #working-directory: docs/html
     #   run: ls
 
-    - name: Show benchmark in dev/bench
+    # - name: Show benchmark in dev/bench
+    #   working-directory: dev/bench
+    #   run: ls
+
+    - name: Show benchmarked before copy checkout
+        working-directory: dev/bench
+        run: ls
+
+    - name: Copy dir from branch
+      run: git checkout benchmark_test -- dev/bench
+
+    - name: Show benchmarked AFTER copy checkout
       working-directory: dev/bench
       run: ls
 
