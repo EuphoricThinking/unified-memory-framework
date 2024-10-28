@@ -1,5 +1,18 @@
-#ifndef UMF_UT_ASSERTS_H
-#define UMF_UT_ASSERTS_H 1
+/*
+ *
+ * Copyright (C) 2023-2024 Intel Corporation
+ *
+ * Under the Apache License v2.0 with LLVM Exceptions. See LICENSE.TXT.
+ * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+ *
+ */
+
+ /*
+ The project uses GTEST framework for testing, which is not supported in C. Therefore, there have been introduced customised asserts for C API test. These asserts should not be used in other purposes than for testing C files 
+ */
+
+#ifndef UMF_TEST_UT_ASSERTS_H
+#define UMF_TEST_UT_ASSERTS_H 1
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -58,4 +71,4 @@ static inline void UT_OUT(const char *format, ...) {
                       (unsigned long long)(rhs)),                              \
              0)))
 
-#endif /* UMF_UT_ASSERTS_H */
+#endif /* UMF_TEST_UT_ASSERTS_H */
