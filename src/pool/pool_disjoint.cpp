@@ -31,26 +31,20 @@
 #include "utils_math.h"
 #include "utils_sanitizers.h"
 
-// Temporary solution for disabling memory poisoning. This is needed because
-// AddressSanitizer does not support memory poisoning for GPU allocations.
-// More info: https://github.com/oneapi-src/unified-memory-framework/issues/634
-#ifndef POISON_MEMORY
-#define POISON_MEMORY 0
+// TODO remove
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-static inline void annotate_memory_inaccessible([[maybe_unused]] void *ptr,
-                                                [[maybe_unused]] size_t size) {
-#if (POISON_MEMORY != 0)
-    utils_annotate_memory_inaccessible(ptr, size);
-#endif
-}
+#include "pool_disjoint_temp.h"
 
-static inline void annotate_memory_undefined([[maybe_unused]] void *ptr,
-                                             [[maybe_unused]] size_t size) {
-#if (POISON_MEMORY != 0)
-    utils_annotate_memory_undefined(ptr, size);
-#endif
+class Bucket;
+struct slab_t;
+
+#ifdef __cplusplus
 }
+#endif
+// end TODO remove
 
 typedef struct umf_disjoint_pool_shared_limits_t {
     size_t MaxSize;
@@ -138,84 +132,14 @@ typedef struct MemoryProviderError {
     umf_result_t code;
 } MemoryProviderError_t;
 
-class Bucket;
-
-// Represents the allocated memory block of size 'SlabMinSize'
-// Internally, it splits the memory block into chunks. The number of
-// chunks depends of the size of a Bucket which created the Slab.
-// Note: Bucket's methods are responsible for thread safety of Slab access,
-// so no locking happens here.
-class Slab {
-
-    // Pointer to the allocated memory of SlabMinSize bytes
-    void *MemPtr;
-
-    // Represents the current state of each chunk:
-    // if the bit is set then the chunk is allocated
-    // the chunk is free for allocation otherwise
-    std::vector<bool> Chunks;
-
-    // Total number of allocated chunks at the moment.
-    size_t NumAllocated = 0;
-
-    // The bucket which the slab belongs to
-    Bucket &bucket;
-
-    using ListIter = std::list<std::unique_ptr<Slab>>::iterator;
-
-    // Store iterator to the corresponding node in avail/unavail list
-    // to achieve O(1) removal
-    ListIter SlabListIter;
-
-    // Hints where to start search for free chunk in a slab
-    size_t FirstFreeChunkIdx = 0;
-
-    // Return the index of the first available chunk, SIZE_MAX otherwise
-    size_t FindFirstAvailableChunkIdx() const;
-
-    // Register/Unregister the slab in the global slab address map.
-    void regSlab(Slab &);
-    void unregSlab(Slab &);
-    static void regSlabByAddr(void *, Slab &);
-    static void unregSlabByAddr(void *, Slab &);
-
-  public:
-    Slab(Bucket &);
-    ~Slab();
-
-    void setIterator(ListIter It) { SlabListIter = It; }
-    ListIter getIterator() const { return SlabListIter; }
-
-    size_t getNumAllocated() const { return NumAllocated; }
-
-    // Get pointer to allocation that is one piece of this slab.
-    void *getChunk();
-
-    // Get pointer to allocation that is this entire slab.
-    void *getSlab();
-
-    void *getPtr() const { return MemPtr; }
-    void *getEnd() const;
-
-    size_t getChunkSize() const;
-    size_t getNumChunks() const { return Chunks.size(); }
-
-    bool hasAvail();
-
-    Bucket &getBucket();
-    const Bucket &getBucket() const;
-
-    void freeChunk(void *Ptr);
-};
-
 class Bucket {
     const size_t Size;
 
     // List of slabs which have at least 1 available chunk.
-    std::list<std::unique_ptr<Slab>> AvailableSlabs;
+    std::list<slab_t *> AvailableSlabs;
 
     // List of slabs with 0 available chunk.
-    std::list<std::unique_ptr<Slab>> UnavailableSlabs;
+    std::list<slab_t *> UnavailableSlabs;
 
     // Protects the bucket and all the corresponding slabs
     std::mutex BucketLock;
@@ -261,6 +185,18 @@ class Bucket {
           currSlabsInPool(0), maxSlabsInPool(0), allocCount(0),
           maxSlabsInUse(0) {}
 
+    ~Bucket() {
+        for (auto it = AvailableSlabs.begin(); it != AvailableSlabs.end();
+             it++) {
+            destroy_slab(*it);
+        }
+
+        for (auto it = UnavailableSlabs.begin(); it != UnavailableSlabs.end();
+             it++) {
+            destroy_slab(*it);
+        }
+    }
+
     // Get pointer to allocation that is one piece of an available slab in this
     // bucket.
     void *getChunk(bool &FromPool);
@@ -272,10 +208,10 @@ class Bucket {
     size_t getSize() const { return Size; }
 
     // Free an allocation that is one piece of a slab in this bucket.
-    void freeChunk(void *Ptr, Slab &Slab, bool &ToPool);
+    void freeChunk(void *Ptr, slab_t *Slab, bool &ToPool);
 
     // Free an allocation that is a full slab in this bucket.
-    void freeSlab(Slab &Slab, bool &ToPool);
+    void freeSlab(slab_t *Slab, bool &ToPool);
 
     umf_memory_provider_handle_t getMemHandle();
 
@@ -312,7 +248,7 @@ class Bucket {
     void printStats(bool &TitlePrinted, const std::string &Label);
 
   private:
-    void onFreeChunk(Slab &, bool &ToPool);
+    void onFreeChunk(slab_t *, bool &ToPool);
 
     // Update statistics of pool usage, and indicate that an allocation was made
     // from the pool.
@@ -328,7 +264,7 @@ class Bucket {
 class DisjointPool::AllocImpl {
     // It's important for the map to be destroyed last after buckets and their
     // slabs This is because slab's destructor removes the object from the map.
-    std::unordered_multimap<void *, Slab &> KnownSlabs;
+    std::unordered_multimap<void *, slab_t *> KnownSlabs;
     std::shared_timed_mutex KnownSlabsMapLock;
 
     // Handle to the memory provider
@@ -390,7 +326,8 @@ class DisjointPool::AllocImpl {
     std::shared_timed_mutex &getKnownSlabsMapLock() {
         return KnownSlabsMapLock;
     }
-    std::unordered_multimap<void *, Slab &> &getKnownSlabs() {
+
+    std::unordered_multimap<void *, slab_t *> &getKnownSlabs() {
         return KnownSlabs;
     }
 
@@ -443,163 +380,15 @@ static void memoryProviderFree(umf_memory_provider_handle_t hProvider,
     }
 }
 
-bool operator==(const Slab &Lhs, const Slab &Rhs) {
-    return Lhs.getPtr() == Rhs.getPtr();
+bool operator==(const slab_t &Lhs, const slab_t &Rhs) {
+    return slab_get(&Lhs) == slab_get(&Rhs);
 }
 
-std::ostream &operator<<(std::ostream &Os, const Slab &Slab) {
-    Os << "Slab<" << Slab.getPtr() << ", " << Slab.getEnd() << ", "
-       << Slab.getBucket().getSize() << ">";
+std::ostream &operator<<(std::ostream &Os, const slab_t &Slab) {
+    Os << "Slab<" << slab_get(&Slab) << ", " << slab_get_end(&Slab) << ", "
+       << (*(Bucket *)slab_get_bucket(&Slab)).getSize() << ">";
     return Os;
 }
-
-Slab::Slab(Bucket &Bkt)
-    : // In case bucket size is not a multiple of SlabMinSize, we would have
-      // some padding at the end of the slab.
-      Chunks(Bkt.SlabMinSize() / Bkt.getSize()), NumAllocated{0},
-      bucket(Bkt), SlabListIter{}, FirstFreeChunkIdx{0} {
-    auto SlabSize = Bkt.SlabAllocSize();
-    MemPtr = memoryProviderAlloc(Bkt.getMemHandle(), SlabSize);
-    regSlab(*this);
-}
-
-Slab::~Slab() {
-    try {
-        unregSlab(*this);
-    } catch (std::exception &e) {
-        LOG_ERR("DisjointPool: unexpected error: %s", e.what());
-    }
-
-    try {
-        memoryProviderFree(bucket.getMemHandle(), MemPtr);
-    } catch (MemoryProviderError &e) {
-        LOG_ERR("DisjointPool: error from memory provider: %d", e.code);
-
-        if (e.code == UMF_RESULT_ERROR_MEMORY_PROVIDER_SPECIFIC) {
-            const char *message = "";
-            int error = 0;
-
-            try {
-                umfMemoryProviderGetLastNativeError(
-                    umfGetLastFailedMemoryProvider(), &message, &error);
-                LOG_ERR("Native error msg: %s, native error code: %d", message,
-                        error);
-            } catch (...) {
-                // ignore any additional errors from logger
-            }
-        }
-    }
-}
-
-// Return the index of the first available chunk, SIZE_MAX otherwise
-size_t Slab::FindFirstAvailableChunkIdx() const {
-    // Use the first free chunk index as a hint for the search.
-    auto It = std::find_if(Chunks.begin() + FirstFreeChunkIdx, Chunks.end(),
-                           [](auto x) { return !x; });
-    if (It != Chunks.end()) {
-        return It - Chunks.begin();
-    }
-
-    return std::numeric_limits<size_t>::max();
-}
-
-void *Slab::getChunk() {
-    // assert(NumAllocated != Chunks.size());
-
-    const size_t ChunkIdx = FindFirstAvailableChunkIdx();
-    // Free chunk must exist, otherwise we would have allocated another slab
-    assert(ChunkIdx != (std::numeric_limits<size_t>::max()));
-
-    void *const FreeChunk =
-        (static_cast<uint8_t *>(getPtr())) + ChunkIdx * getChunkSize();
-    Chunks[ChunkIdx] = true;
-    NumAllocated += 1;
-
-    // Use the found index as the next hint
-    FirstFreeChunkIdx = ChunkIdx;
-
-    return FreeChunk;
-}
-
-void *Slab::getSlab() { return getPtr(); }
-
-Bucket &Slab::getBucket() { return bucket; }
-const Bucket &Slab::getBucket() const { return bucket; }
-
-size_t Slab::getChunkSize() const { return bucket.getSize(); }
-
-void Slab::regSlabByAddr(void *Addr, Slab &Slab) {
-    auto &Lock = Slab.getBucket().getAllocCtx().getKnownSlabsMapLock();
-    auto &Map = Slab.getBucket().getAllocCtx().getKnownSlabs();
-
-    std::lock_guard<std::shared_timed_mutex> Lg(Lock);
-    Map.insert({Addr, Slab});
-}
-
-void Slab::unregSlabByAddr(void *Addr, Slab &Slab) {
-    auto &Lock = Slab.getBucket().getAllocCtx().getKnownSlabsMapLock();
-    auto &Map = Slab.getBucket().getAllocCtx().getKnownSlabs();
-
-    std::lock_guard<std::shared_timed_mutex> Lg(Lock);
-
-    auto Slabs = Map.equal_range(Addr);
-    // At least the must get the current slab from the map.
-    assert(Slabs.first != Slabs.second && "Slab is not found");
-
-    for (auto It = Slabs.first; It != Slabs.second; ++It) {
-        if (It->second == Slab) {
-            Map.erase(It);
-            return;
-        }
-    }
-
-    assert(false && "Slab is not found");
-}
-
-void Slab::regSlab(Slab &Slab) {
-    void *StartAddr = AlignPtrDown(Slab.getPtr(), bucket.SlabMinSize());
-    void *EndAddr = static_cast<char *>(StartAddr) + bucket.SlabMinSize();
-
-    regSlabByAddr(StartAddr, Slab);
-    regSlabByAddr(EndAddr, Slab);
-}
-
-void Slab::unregSlab(Slab &Slab) {
-    void *StartAddr = AlignPtrDown(Slab.getPtr(), bucket.SlabMinSize());
-    void *EndAddr = static_cast<char *>(StartAddr) + bucket.SlabMinSize();
-
-    unregSlabByAddr(StartAddr, Slab);
-    unregSlabByAddr(EndAddr, Slab);
-}
-
-void Slab::freeChunk(void *Ptr) {
-    // This method should be called through bucket(since we might remove the slab
-    // as a result), therefore all locks are done on that level.
-
-    // Make sure that we're in the right slab
-    assert(Ptr >= getPtr() && Ptr < getEnd());
-
-    // Even if the pointer p was previously aligned, it's still inside the
-    // corresponding chunk, so we get the correct index here.
-    auto ChunkIdx = (static_cast<char *>(Ptr) - static_cast<char *>(MemPtr)) /
-                    getChunkSize();
-
-    // Make sure that the chunk was allocated
-    assert(Chunks[ChunkIdx] && "double free detected");
-
-    Chunks[ChunkIdx] = false;
-    NumAllocated -= 1;
-
-    if (ChunkIdx < FirstFreeChunkIdx) {
-        FirstFreeChunkIdx = ChunkIdx;
-    }
-}
-
-void *Slab::getEnd() const {
-    return static_cast<char *>(getPtr()) + bucket.SlabMinSize();
-}
-
-bool Slab::hasAvail() { return NumAllocated != getNumChunks(); }
 
 // If a slab was available in the pool then note that the current pooled
 // size has reduced by the size of a slab in this bucket.
@@ -609,13 +398,19 @@ void Bucket::decrementPool(bool &FromPool) {
     OwnAllocCtx.getLimits()->TotalSize -= SlabAllocSize();
 }
 
-auto Bucket::getAvailFullSlab(bool &FromPool)
-    -> decltype(AvailableSlabs.begin()) {
+std::list<slab_t *>::iterator Bucket::getAvailFullSlab(bool &FromPool) {
     // Return a slab that will be used for a single allocation.
     if (AvailableSlabs.size() == 0) {
-        auto It = AvailableSlabs.insert(AvailableSlabs.begin(),
-                                        std::make_unique<Slab>(*this));
-        (*It)->setIterator(It);
+        slab_t *slab = create_slab((bucket_t *)this,
+                                   sizeof(std::list<slab_t *>::iterator));
+        if (slab == NULL) {
+            throw MemoryProviderError{UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY};
+        }
+
+        slab_reg(slab);
+        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
+        slab_set_iterator(slab, &It);
+
         FromPool = false;
         updateStats(1, 0);
     } else {
@@ -629,24 +424,28 @@ void *Bucket::getSlab(bool &FromPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
     auto SlabIt = getAvailFullSlab(FromPool);
-    auto *FreeSlab = (*SlabIt)->getSlab();
-    auto It =
-        UnavailableSlabs.insert(UnavailableSlabs.begin(), std::move(*SlabIt));
+    slab_t *slab = *SlabIt;
+
+    void *ptr = slab_get(slab);
+    auto It = UnavailableSlabs.insert(UnavailableSlabs.begin(), slab);
     AvailableSlabs.erase(SlabIt);
-    (*It)->setIterator(It);
-    return FreeSlab;
+    slab_set_iterator(slab, &It);
+    return ptr;
 }
 
-void Bucket::freeSlab(Slab &Slab, bool &ToPool) {
+void Bucket::freeSlab(slab_t *slab, bool &ToPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
-    auto SlabIter = Slab.getIterator();
+
+    auto SlabIter = *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
     assert(SlabIter != UnavailableSlabs.end());
     if (CanPool(ToPool)) {
         auto It =
             AvailableSlabs.insert(AvailableSlabs.begin(), std::move(*SlabIter));
         UnavailableSlabs.erase(SlabIter);
-        (*It)->setIterator(It);
+        slab_set_iterator(*It, &It);
     } else {
+        slab_unreg(*SlabIter);
+        destroy_slab(*SlabIter);
         UnavailableSlabs.erase(SlabIter);
     }
 }
@@ -654,14 +453,20 @@ void Bucket::freeSlab(Slab &Slab, bool &ToPool) {
 auto Bucket::getAvailSlab(bool &FromPool) -> decltype(AvailableSlabs.begin()) {
 
     if (AvailableSlabs.size() == 0) {
-        auto It = AvailableSlabs.insert(AvailableSlabs.begin(),
-                                        std::make_unique<Slab>(*this));
-        (*It)->setIterator(It);
+        slab_t *slab = create_slab((bucket_t *)this,
+                                   sizeof(std::list<slab_t *>::iterator));
+        if (slab == NULL) {
+            throw MemoryProviderError{UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY};
+        }
+
+        slab_reg(slab);
+        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
+        slab_set_iterator(slab, &It);
 
         updateStats(1, 0);
         FromPool = false;
     } else {
-        if ((*(AvailableSlabs.begin()))->getNumAllocated() == 0) {
+        if (slab_get_num_allocated(*(AvailableSlabs.begin())) == 0) {
             // If this was an empty slab, it was in the pool.
             // Now it is no longer in the pool, so update count.
             --chunkedSlabsInPool;
@@ -679,46 +484,45 @@ void *Bucket::getChunk(bool &FromPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
     auto SlabIt = getAvailSlab(FromPool);
-    auto *FreeChunk = (*SlabIt)->getChunk();
+    auto *FreeChunk = slab_get_chunk((*SlabIt));
 
     // If the slab is full, move it to unavailable slabs and update its iterator
-    if (!((*SlabIt)->hasAvail())) {
-        auto It = UnavailableSlabs.insert(UnavailableSlabs.begin(),
-                                          std::move(*SlabIt));
+    if (!(slab_has_avail(*SlabIt))) {
+        auto It = UnavailableSlabs.insert(UnavailableSlabs.begin(), *SlabIt);
         AvailableSlabs.erase(SlabIt);
-        (*It)->setIterator(It);
+        slab_set_iterator(*It, &It);
     }
 
     return FreeChunk;
 }
 
-void Bucket::freeChunk(void *Ptr, Slab &Slab, bool &ToPool) {
+void Bucket::freeChunk(void *ptr, slab_t *Slab, bool &ToPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
-    Slab.freeChunk(Ptr);
+    slab_free_chunk(Slab, ptr);
 
     onFreeChunk(Slab, ToPool);
 }
 
 // The lock must be acquired before calling this method
-void Bucket::onFreeChunk(Slab &Slab, bool &ToPool) {
+void Bucket::onFreeChunk(slab_t *slab, bool &ToPool) {
     ToPool = true;
 
     // In case if the slab was previously full and now has 1 available
     // chunk, it should be moved to the list of available slabs
-    if (Slab.getNumAllocated() == (Slab.getNumChunks() - 1)) {
-        auto SlabIter = Slab.getIterator();
+    if (slab_get_num_allocated(slab) == (slab_get_num_chunks(slab) - 1)) {
+        auto SlabIter =
+            *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
         assert(SlabIter != UnavailableSlabs.end());
 
-        auto It =
-            AvailableSlabs.insert(AvailableSlabs.begin(), std::move(*SlabIter));
+        slab_t *slab = *SlabIter;
+        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
         UnavailableSlabs.erase(SlabIter);
-
-        (*It)->setIterator(It);
+        slab_set_iterator(slab, &It);
     }
 
     // Check if slab is empty, and pool it if we can.
-    if (Slab.getNumAllocated() == 0) {
+    if (slab_get_num_allocated(slab) == 0) {
         // The slab is now empty.
         // If pool has capacity then put the slab in the pool.
         // The ToPool parameter indicates whether the Slab will be put in the
@@ -726,8 +530,10 @@ void Bucket::onFreeChunk(Slab &Slab, bool &ToPool) {
         if (!CanPool(ToPool)) {
             // Note: since the slab is stored as unique_ptr, just remove it from
             // the list to destroy the object.
-            auto It = Slab.getIterator();
+            auto It = *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
             assert(It != AvailableSlabs.end());
+            slab_unreg(*It);
+            destroy_slab(*It);
             AvailableSlabs.erase(It);
         }
     }
@@ -971,22 +777,22 @@ void DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
         // The slab object won't be deleted until it's removed from the map which is
         // protected by the lock, so it's safe to access it here.
         auto &Slab = It->second;
-        if (Ptr >= Slab.getPtr() && Ptr < Slab.getEnd()) {
+        if (Ptr >= slab_get(Slab) && Ptr < slab_get_end(Slab)) {
             // Unlock the map before freeing the chunk, it may be locked on write
             // there
             Lk.unlock();
-            auto &Bucket = Slab.getBucket();
+            auto bucket = (Bucket *)slab_get_bucket(Slab);
 
             if (getParams().PoolTrace > 1) {
-                Bucket.countFree();
+                bucket->countFree();
             }
 
             VALGRIND_DO_MEMPOOL_FREE(this, Ptr);
-            annotate_memory_inaccessible(Ptr, Bucket.getSize());
-            if (Bucket.getSize() <= Bucket.ChunkCutOff()) {
-                Bucket.freeChunk(Ptr, Slab, ToPool);
+            annotate_memory_inaccessible(Ptr, bucket->getSize());
+            if (bucket->getSize() <= bucket->ChunkCutOff()) {
+                bucket->freeChunk(Ptr, Slab, ToPool);
             } else {
-                Bucket.freeSlab(Slab, ToPool);
+                bucket->freeSlab(Slab, ToPool);
             }
 
             return;
@@ -1129,3 +935,78 @@ static umf_memory_pool_ops_t UMF_DISJOINT_POOL_OPS =
 umf_memory_pool_ops_t *umfDisjointPoolOps(void) {
     return &UMF_DISJOINT_POOL_OPS;
 }
+
+// TODO remove
+#ifdef __cplusplus
+extern "C" {
+#endif
+size_t bucket_get_slab_min_size(const bucket_t bucket) {
+    return ((Bucket *)bucket)->SlabMinSize();
+}
+
+size_t bucket_get_slab_alloc_size(const bucket_t bucket) {
+    return ((Bucket *)bucket)->SlabAllocSize();
+}
+
+size_t bucket_get_size(const bucket_t bucket) {
+    return ((Bucket *)bucket)->getSize();
+}
+
+umf_memory_provider_handle_t bucket_get_provider(const bucket_t bucket) {
+    return ((Bucket *)bucket)->getMemHandle();
+}
+
+void slab_reg_by_addr(void *addr, slab_t *slab) {
+    auto &Lock =
+        ((Bucket *)slab_get_bucket(slab))->getAllocCtx().getKnownSlabsMapLock();
+    auto &Map =
+        ((Bucket *)slab_get_bucket(slab))->getAllocCtx().getKnownSlabs();
+
+    std::lock_guard<std::shared_timed_mutex> Lg(Lock);
+    Map.insert({addr, slab});
+}
+
+void slab_unreg_by_addr(void *addr, slab_t *slab) {
+    auto &Lock =
+        ((Bucket *)slab_get_bucket(slab))->getAllocCtx().getKnownSlabsMapLock();
+    auto &Map =
+        ((Bucket *)slab_get_bucket(slab))->getAllocCtx().getKnownSlabs();
+
+    std::lock_guard<std::shared_timed_mutex> Lg(Lock);
+
+    auto Slabs = Map.equal_range(addr);
+    // At least the must get the current slab from the map.
+    assert(Slabs.first != Slabs.second && "Slab is not found");
+
+    for (auto It = Slabs.first; It != Slabs.second; ++It) {
+        if (It->second == slab) {
+            Map.erase(It);
+            return;
+        }
+    }
+
+    assert(false && "Slab is not found");
+}
+
+void slab_reg(slab_t *slab) {
+    Bucket *bucket = (Bucket *)slab_get_bucket(slab);
+    void *start_addr = AlignPtrDown(slab_get(slab), bucket->SlabMinSize());
+    void *end_addr = static_cast<char *>(start_addr) + bucket->SlabMinSize();
+
+    slab_reg_by_addr(start_addr, slab);
+    slab_reg_by_addr(end_addr, slab);
+}
+
+void slab_unreg(slab_t *slab) {
+    Bucket *bucket = (Bucket *)slab_get_bucket(slab);
+    void *start_addr = AlignPtrDown(slab_get(slab), bucket->SlabMinSize());
+    void *end_addr = static_cast<char *>(start_addr) + bucket->SlabMinSize();
+
+    slab_unreg_by_addr(start_addr, slab);
+    slab_unreg_by_addr(end_addr, slab);
+}
+
+#ifdef __cplusplus
+}
+#endif
+// end TODO remove

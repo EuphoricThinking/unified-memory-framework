@@ -14,7 +14,7 @@ if(UMF_BUILD_LIBUMF_POOL_DISJOINT)
     add_umf_library(
         NAME disjoint_pool
         TYPE STATIC
-        SRCS pool_disjoint.cpp ${POOL_EXTRA_SRCS}
+        SRCS pool_disjoint.cpp pool_disjoint.c ${POOL_EXTRA_SRCS}
         LIBS ${POOL_EXTRA_LIBS})
 
     target_compile_definitions(disjoint_pool
