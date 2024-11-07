@@ -157,6 +157,7 @@ if __name__ == "__main__":
     parser.add_argument('benchmark_directory', type=str, help='Working directory to setup benchmarks.')
     parser.add_argument('--sycl', type=str, help='Root directory of the SYCL compiler.', default=None)
     parser.add_argument('--ur', type=str, help='UR install prefix path', default=None)
+    parser.add_argument('--umf', type=str, help='UMF install prefix path')
     parser.add_argument('--adapter', type=str, help='Options to build the Unified Runtime as part of the benchmark', default="level_zero")
     parser.add_argument("--no-rebuild", help='Rebuild the benchmarks from scratch.', action="store_true")
     parser.add_argument("--env", type=str, help='Use env variable for a benchmark run.', action="append", default=[])
@@ -184,6 +185,7 @@ if __name__ == "__main__":
     options.timeout = args.timeout
     options.epsilon = args.epsilon
     options.ur = args.ur
+    options.umf = args.umf
     options.ur_adapter = args.adapter
     options.exit_on_failure = args.exit_on_failure
     options.compare = Compare(args.compare_type)
