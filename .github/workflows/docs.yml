@@ -3,7 +3,7 @@ name: GitHubPages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["benchmark_python9_11_fulljob"]
 
 # Cancel previous in-progress workflow, only the latest run is relevant
 concurrency:

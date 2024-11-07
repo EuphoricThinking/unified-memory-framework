@@ -45,6 +45,19 @@ jobs:
           -DUMF_DISABLE_HWLOC=ON
         cmake --build build --target docs
 
+    - name: Download benchmark HTML
+      id: download-bench-html
+      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+      with:
+        path: ${{github.workspace}}/build/benchmark_results.html
+        key: benchmark-results-
+
+    - name: Move benchmark HTML
+      # exact or partial cache hit
+      if: steps.download-bench-html.outputs.cache-hit != ''
+      run: |
+        mv ${{ github.workspace }}/build/benchmark_results.html ${{ github.workspace }}/build/docs_build/generated/html
+
     - name: Upload artifact
       if: ${{ inputs.upload == true }}
       uses: actions/upload-pages-artifact@0252fc4ba7626f0298f0cf00902a25c6afc77fa8 # v3.0.0
