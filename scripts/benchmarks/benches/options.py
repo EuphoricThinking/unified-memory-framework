@@ -10,6 +10,7 @@ class Compare(Enum):
 class Options:
     sycl: str = None
     ur: str = None
+    umf: str = None
     ur_adapter: str = None
     rebuild: bool = True
     benchmark_cwd: str = "INVALID"
