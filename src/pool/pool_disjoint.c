@@ -16,6 +16,7 @@
 #include <umf/pools/pool_disjoint.h>
 
 #include "base_alloc_global.h"
+#include "uthash/utlist.h"
 #include "utils_common.h"
 #include "utils_concurrency.h"
 #include "utils_log.h"
@@ -50,15 +51,12 @@ extern "C" {
 #endif
 }
 
-size_t bucket_get_slab_min_size(const bucket_t bucket);
-size_t bucket_get_slab_alloc_size(const bucket_t bucket);
-size_t bucket_get_size(const bucket_t bucket);
-umf_memory_provider_handle_t bucket_get_provider(const bucket_t bucket);
+size_t bucket_get_size(bucket_t *bucket);
 
 void slab_reg(slab_t *slab);
 void slab_unreg(slab_t *slab);
 
-slab_t *create_slab(bucket_t bucket) {
+slab_t *create_slab(bucket_t *bucket) {
     // In case bucket size is not a multiple of SlabMinSize, we would have
     // some padding at the end of the slab.
     slab_t *slab = umf_ba_global_alloc(sizeof(slab_t));
@@ -73,14 +71,13 @@ slab_t *create_slab(bucket_t bucket) {
     slab->iter->val = slab;
     slab->iter->prev = slab->iter->next = NULL;
 
-    slab->num_chunks =
-        bucket_get_slab_min_size(bucket) / bucket_get_size(bucket);
+    slab->num_chunks = bucket_slab_min_size(bucket) / bucket_get_size(bucket);
     slab->chunks = umf_ba_global_alloc(sizeof(bool) * slab->num_chunks);
     memset(slab->chunks, 0, sizeof(bool) * slab->num_chunks);
 
-    slab->slab_size = bucket_get_slab_alloc_size(bucket);
+    slab->slab_size = bucket_slab_alloc_size(bucket);
     umf_result_t res = umfMemoryProviderAlloc(
-        bucket_get_provider(bucket), slab->slab_size, 0, &slab->mem_ptr);
+        bucket_get_mem_handle(bucket), slab->slab_size, 0, &slab->mem_ptr);
 
     if (res == UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY) {
         destroy_slab(slab);
@@ -88,18 +85,18 @@ slab_t *create_slab(bucket_t bucket) {
     }
 
     annotate_memory_inaccessible(slab->mem_ptr, slab->slab_size);
-    fprintf(stderr, "[DP create_slab] bucket: %p, slab_size: %zu\n", bucket,
-            slab->slab_size);
+    fprintf(stderr, "[DP create_slab] bucket: %p, slab_size: %zu\n",
+            (void *)bucket, slab->slab_size);
 
     return slab;
 }
 
 void destroy_slab(slab_t *slab) {
     fprintf(stderr, "[DP destroy_slab] bucket: %p, slab_size: %zu\n",
-            slab->bucket, slab->slab_size);
+            (void *)slab->bucket, slab->slab_size);
 
-    umf_result_t res = umfMemoryProviderFree(bucket_get_provider(slab->bucket),
-                                             slab->mem_ptr, slab->slab_size);
+    umf_result_t res = umfMemoryProviderFree(
+        bucket_get_mem_handle(slab->bucket), slab->mem_ptr, slab->slab_size);
     assert(res == UMF_RESULT_SUCCESS);
     umf_ba_global_free(slab->chunks);
     umf_ba_global_free(slab->iter);
@@ -154,12 +151,12 @@ void *slab_get_chunk(slab_t *slab) {
 }
 
 void *slab_get_end(const slab_t *slab) {
-    return (uint8_t *)slab->mem_ptr + bucket_get_slab_min_size(slab->bucket);
+    return (uint8_t *)slab->mem_ptr + bucket_slab_min_size(slab->bucket);
 }
 
 // TODO remove? why need getter/setter?
 void *slab_get(const slab_t *slab) { return slab->mem_ptr; }
-bucket_t slab_get_bucket(const slab_t *slab) { return slab->bucket; }
+bucket_t *slab_get_bucket(slab_t *slab) { return slab->bucket; }
 size_t slab_get_chunk_size(const slab_t *slab) {
     return bucket_get_size(slab->bucket);
 }
@@ -193,6 +190,112 @@ void slab_free_chunk(slab_t *slab, void *ptr) {
 
 bool slab_has_avail(const slab_t *slab) {
     return slab->num_allocated != slab->num_chunks;
+}
+
+void slab_reg(slab_t *slab) {
+    bucket_t *bucket = slab_get_bucket(slab);
+    void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
+                                          bucket_slab_min_size(bucket));
+    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket);
+
+    slab_reg_by_addr(start_addr, slab);
+    slab_reg_by_addr(end_addr, slab);
+}
+
+void slab_unreg(slab_t *slab) {
+    bucket_t *bucket = slab_get_bucket(slab);
+    void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
+                                          bucket_slab_min_size(bucket));
+    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket);
+
+    slab_unreg_by_addr(start_addr, slab);
+    slab_unreg_by_addr(end_addr, slab);
+}
+
+// The lock must be acquired before calling this method
+void bucket_on_free_chunk(bucket_t *bucket, slab_t *slab, bool *ToPool) {
+    *ToPool = true;
+
+    // In case if the slab was previously full and now has 1 available
+    // chunk, it should be moved to the list of available slabs
+    if (slab_get_num_allocated(slab) == (slab_get_num_chunks(slab) - 1)) {
+        slab_list_item_t *slab_it = slab->iter;
+        assert(slab_it->val != NULL);
+        DL_DELETE(bucket->UnavailableSlabs, slab_it);
+        DL_PREPEND(bucket->AvailableSlabs, slab_it);
+    }
+
+    // Check if slab is empty, and pool it if we can.
+    if (slab_get_num_allocated(slab) == 0) {
+        // The slab is now empty.
+        // If pool has capacity then put the slab in the pool.
+        // The ToPool parameter indicates whether the Slab will be put in the
+        // pool or freed.
+        if (!bucket_can_pool(bucket, ToPool)) {
+            // Note: since the slab is stored as unique_ptr, just remove it from
+            // the list to destroy the object.
+            slab_list_item_t *slab_it = slab->iter;
+            assert(slab_it->val != NULL);
+            slab_unreg(slab_it->val);
+            DL_DELETE(bucket->AvailableSlabs, slab_it);
+            destroy_slab(slab_it->val);
+        }
+    }
+}
+
+// Return the allocation size of this bucket.
+size_t bucket_get_size(bucket_t *bucket) { return bucket->Size; }
+
+void *bucket_get_alloc_ctx(bucket_t *bucket) { return bucket->OwnAllocCtx; }
+
+void bucket_count_free(bucket_t *bucket) { ++bucket->freeCount; }
+
+void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *Slab,
+                       bool *ToPool) {
+    utils_mutex_lock(&bucket->bucket_lock);
+
+    slab_free_chunk(Slab, ptr);
+    bucket_on_free_chunk(bucket, Slab, ToPool);
+
+    utils_mutex_unlock(&bucket->bucket_lock);
+}
+
+void bucket_count_alloc(bucket_t *bucket, bool FromPool) {
+    ++bucket->allocCount;
+    if (FromPool) {
+        ++bucket->allocPoolCount;
+    }
+}
+
+void *bucket_get_chunk(bucket_t *bucket, bool *FromPool) {
+    utils_mutex_lock(&bucket->bucket_lock);
+
+    slab_list_item_t *slab_it = bucket_get_avail_slab(bucket, FromPool);
+    void *free_chunk = slab_get_chunk(slab_it->val);
+
+    // If the slab is full, move it to unavailable slabs and update its iterator
+    if (!(slab_has_avail(slab_it->val))) {
+        DL_DELETE(bucket->AvailableSlabs, slab_it);
+        DL_PREPEND(bucket->UnavailableSlabs, slab_it);
+    }
+
+    utils_mutex_unlock(&bucket->bucket_lock);
+    return free_chunk;
+}
+
+size_t bucket_chunk_cut_off(bucket_t *bucket) {
+    return bucket_slab_min_size(bucket) / 2;
+}
+
+size_t bucket_slab_alloc_size(bucket_t *bucket) {
+    // return max
+    return (bucket_get_size(bucket) > bucket_slab_min_size(bucket))
+               ? bucket_get_size(bucket)
+               : bucket_slab_min_size(bucket);
+}
+
+size_t bucket_slab_min_size(bucket_t *bucket) {
+    return bucket_get_params(bucket)->SlabMinSize;
 }
 
 #ifdef __cplusplus
