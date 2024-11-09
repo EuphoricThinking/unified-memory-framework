@@ -27,6 +27,7 @@
 #include "../cpp_helpers.hpp"
 #include "pool_disjoint.h"
 #include "umf.h"
+#include "utils_common.h"
 #include "utils_log.h"
 #include "utils_math.h"
 #include "utils_sanitizers.h"
@@ -102,31 +103,6 @@ void umfDisjointPoolSharedLimitsDestroy(
 // Allocations with size > CutOff bypass the pool and
 // go directly to the provider.
 static constexpr size_t CutOff = (size_t)1 << 31; // 2GB
-
-// Aligns the pointer down to the specified alignment
-// (e.g. returns 8 for Size = 13, Alignment = 8)
-static void *AlignPtrDown(void *Ptr, const size_t Alignment) {
-    return reinterpret_cast<void *>((reinterpret_cast<size_t>(Ptr)) &
-                                    (~(Alignment - 1)));
-}
-
-// Aligns the pointer up to the specified alignment
-// (e.g. returns 16 for Size = 13, Alignment = 8)
-static void *AlignPtrUp(void *Ptr, const size_t Alignment) {
-    void *AlignedPtr = AlignPtrDown(Ptr, Alignment);
-    // Special case when the pointer is already aligned
-    if (Ptr == AlignedPtr) {
-        return Ptr;
-    }
-    return static_cast<char *>(AlignedPtr) + Alignment;
-}
-
-// Aligns the value up to the specified alignment
-// (e.g. returns 16 for Size = 13, Alignment = 8)
-static size_t AlignUp(size_t Val, size_t Alignment) {
-    assert(Alignment > 0);
-    return (Val + Alignment - 1) & (~(Alignment - 1));
-}
 
 typedef struct MemoryProviderError {
     umf_result_t code;
@@ -691,7 +667,7 @@ void *DisjointPool::AllocImpl::allocate(size_t Size, size_t Alignment,
         // This allocation will be served from a Bucket which size is multiple
         // of Alignment and Slab address is aligned to ProviderMinPageSize
         // so the address will be properly aligned.
-        AlignedSize = (Size > 1) ? AlignUp(Size, Alignment) : Alignment;
+        AlignedSize = (Size > 1) ? ALIGN_UP(Size, Alignment) : Alignment;
     } else {
         // Slabs are only aligned to ProviderMinPageSize, we need to compensate
         // for that in case the allocation is within pooling limit.
@@ -720,9 +696,9 @@ void *DisjointPool::AllocImpl::allocate(size_t Size, size_t Alignment,
         Bucket.countAlloc(FromPool);
     }
 
-    VALGRIND_DO_MEMPOOL_ALLOC(this, AlignPtrUp(Ptr, Alignment), Size);
-    annotate_memory_undefined(AlignPtrUp(Ptr, Alignment), Size);
-    return AlignPtrUp(Ptr, Alignment);
+    VALGRIND_DO_MEMPOOL_ALLOC(this, ALIGN_UP((size_t)Ptr, Alignment), Size);
+    annotate_memory_undefined((void *)ALIGN_UP((size_t)Ptr, Alignment), Size);
+    return (void *)ALIGN_UP((size_t)Ptr, Alignment);
 } catch (MemoryProviderError &e) {
     umf::getPoolLastStatusRef<DisjointPool>() = e.code;
     return nullptr;
@@ -760,7 +736,11 @@ Bucket &DisjointPool::AllocImpl::findBucket(size_t Size) {
 }
 
 void DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
-    auto *SlabPtr = AlignPtrDown(Ptr, SlabMinSize());
+    if (Ptr == nullptr) {
+        return;
+    }
+
+    auto *SlabPtr = (void *)ALIGN_DOWN((size_t)Ptr, SlabMinSize());
 
     // Lock the map on read
     std::shared_lock<std::shared_timed_mutex> Lk(getKnownSlabsMapLock());
@@ -990,7 +970,8 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
 
 void slab_reg(slab_t *slab) {
     Bucket *bucket = (Bucket *)slab_get_bucket(slab);
-    void *start_addr = AlignPtrDown(slab_get(slab), bucket->SlabMinSize());
+    void *start_addr =
+        (void *)ALIGN_DOWN((size_t)slab_get(slab), bucket->SlabMinSize());
     void *end_addr = static_cast<char *>(start_addr) + bucket->SlabMinSize();
 
     slab_reg_by_addr(start_addr, slab);
@@ -999,7 +980,8 @@ void slab_reg(slab_t *slab) {
 
 void slab_unreg(slab_t *slab) {
     Bucket *bucket = (Bucket *)slab_get_bucket(slab);
-    void *start_addr = AlignPtrDown(slab_get(slab), bucket->SlabMinSize());
+    void *start_addr =
+        (void *)ALIGN_DOWN((size_t)slab_get(slab), bucket->SlabMinSize());
     void *end_addr = static_cast<char *>(start_addr) + bucket->SlabMinSize();
 
     slab_unreg_by_addr(start_addr, slab);
