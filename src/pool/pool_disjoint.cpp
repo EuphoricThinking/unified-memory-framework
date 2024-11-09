@@ -24,6 +24,8 @@
 
 #include "provider/provider_tracking.h"
 
+#include "uthash/utlist.h"
+
 #include "../cpp_helpers.hpp"
 #include "pool_disjoint.h"
 #include "umf.h"
@@ -112,10 +114,10 @@ class Bucket {
     const size_t Size;
 
     // List of slabs which have at least 1 available chunk.
-    std::list<slab_t *> AvailableSlabs;
+    slab_list_item_t *AvailableSlabs;
 
     // List of slabs with 0 available chunk.
-    std::list<slab_t *> UnavailableSlabs;
+    slab_list_item_t *UnavailableSlabs;
 
     // Protects the bucket and all the corresponding slabs
     std::mutex BucketLock;
@@ -156,21 +158,25 @@ class Bucket {
     size_t maxSlabsInUse;
 
     Bucket(size_t Sz, DisjointPool::AllocImpl &AllocCtx)
-        : Size{Sz}, OwnAllocCtx{AllocCtx}, chunkedSlabsInPool(0),
-          allocPoolCount(0), freeCount(0), currSlabsInUse(0),
-          currSlabsInPool(0), maxSlabsInPool(0), allocCount(0),
-          maxSlabsInUse(0) {}
+        : Size{Sz}, OwnAllocCtx{AllocCtx} {
+        AvailableSlabs = NULL;
+        UnavailableSlabs = NULL;
+        chunkedSlabsInPool = 0;
+        allocPoolCount = 0;
+        freeCount = 0;
+        currSlabsInUse = 0;
+        currSlabsInPool = 0;
+        maxSlabsInPool = 0;
+        allocCount = 0;
+        maxSlabsInUse = 0;
+    }
 
     ~Bucket() {
-        for (auto it = AvailableSlabs.begin(); it != AvailableSlabs.end();
-             it++) {
-            destroy_slab(*it);
-        }
-
-        for (auto it = UnavailableSlabs.begin(); it != UnavailableSlabs.end();
-             it++) {
-            destroy_slab(*it);
-        }
+        slab_list_item_t *it = NULL, *tmp = NULL;
+        // TODO check eng
+        // use extra tmp to store next iterator before the slab is destroyed
+        LL_FOREACH_SAFE(AvailableSlabs, it, tmp) { destroy_slab(it->val); }
+        LL_FOREACH_SAFE(UnavailableSlabs, it, tmp) { destroy_slab(it->val); }
     }
 
     // Get pointer to allocation that is one piece of an available slab in this
@@ -231,10 +237,10 @@ class Bucket {
     void decrementPool(bool &FromPool);
 
     // Get a slab to be used for chunked allocations.
-    decltype(AvailableSlabs.begin()) getAvailSlab(bool &FromPool);
+    slab_list_item_t *getAvailSlab(bool &FromPool);
 
     // Get a slab that will be used as a whole for a single allocation.
-    decltype(AvailableSlabs.begin()) getAvailFullSlab(bool &FromPool);
+    slab_list_item_t *getAvailFullSlab(bool &FromPool);
 };
 
 class DisjointPool::AllocImpl {
@@ -374,75 +380,65 @@ void Bucket::decrementPool(bool &FromPool) {
     OwnAllocCtx.getLimits()->TotalSize -= SlabAllocSize();
 }
 
-std::list<slab_t *>::iterator Bucket::getAvailFullSlab(bool &FromPool) {
+slab_list_item_t *Bucket::getAvailFullSlab(bool &FromPool) {
     // Return a slab that will be used for a single allocation.
-    if (AvailableSlabs.size() == 0) {
-        slab_t *slab = create_slab((bucket_t *)this,
-                                   sizeof(std::list<slab_t *>::iterator));
+    if (AvailableSlabs == NULL) {
+        slab_t *slab = create_slab((bucket_t *)this);
         if (slab == NULL) {
             throw MemoryProviderError{UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY};
         }
 
         slab_reg(slab);
-        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
-        slab_set_iterator(slab, &It);
-
+        DL_PREPEND(AvailableSlabs, slab->iter);
         FromPool = false;
         updateStats(1, 0);
     } else {
         decrementPool(FromPool);
     }
 
-    return AvailableSlabs.begin();
+    return AvailableSlabs;
 }
 
 void *Bucket::getSlab(bool &FromPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
-    auto SlabIt = getAvailFullSlab(FromPool);
-    slab_t *slab = *SlabIt;
-
+    slab_list_item_t *slab_it = getAvailFullSlab(FromPool);
+    slab_t *slab = slab_it->val;
     void *ptr = slab_get(slab);
-    auto It = UnavailableSlabs.insert(UnavailableSlabs.begin(), slab);
-    AvailableSlabs.erase(SlabIt);
-    slab_set_iterator(slab, &It);
+
+    DL_DELETE(AvailableSlabs, slab_it);
+    DL_PREPEND(UnavailableSlabs, slab_it);
     return ptr;
 }
 
 void Bucket::freeSlab(slab_t *slab, bool &ToPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
-    auto SlabIter = *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
-    assert(SlabIter != UnavailableSlabs.end());
+    slab_list_item_t *slab_it = slab->iter;
+    assert(slab_it->val != NULL);
     if (CanPool(ToPool)) {
-        auto It =
-            AvailableSlabs.insert(AvailableSlabs.begin(), std::move(*SlabIter));
-        UnavailableSlabs.erase(SlabIter);
-        slab_set_iterator(*It, &It);
+        DL_DELETE(UnavailableSlabs, slab_it);
+        DL_PREPEND(AvailableSlabs, slab_it);
     } else {
-        slab_unreg(*SlabIter);
-        destroy_slab(*SlabIter);
-        UnavailableSlabs.erase(SlabIter);
+        slab_unreg(slab_it->val);
+        DL_DELETE(UnavailableSlabs, slab_it);
+        destroy_slab(slab_it->val);
     }
 }
 
-auto Bucket::getAvailSlab(bool &FromPool) -> decltype(AvailableSlabs.begin()) {
-
-    if (AvailableSlabs.size() == 0) {
-        slab_t *slab = create_slab((bucket_t *)this,
-                                   sizeof(std::list<slab_t *>::iterator));
+slab_list_item_t *Bucket::getAvailSlab(bool &FromPool) {
+    if (AvailableSlabs == NULL) {
+        slab_t *slab = create_slab((bucket_t *)this);
         if (slab == NULL) {
             throw MemoryProviderError{UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY};
         }
 
         slab_reg(slab);
-        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
-        slab_set_iterator(slab, &It);
-
+        DL_PREPEND(AvailableSlabs, slab->iter);
         updateStats(1, 0);
         FromPool = false;
     } else {
-        if (slab_get_num_allocated(*(AvailableSlabs.begin())) == 0) {
+        if (slab_get_num_allocated(AvailableSlabs->val) == 0) {
             // If this was an empty slab, it was in the pool.
             // Now it is no longer in the pool, so update count.
             --chunkedSlabsInPool;
@@ -453,20 +449,19 @@ auto Bucket::getAvailSlab(bool &FromPool) -> decltype(AvailableSlabs.begin()) {
         }
     }
 
-    return AvailableSlabs.begin();
+    return AvailableSlabs;
 }
 
 void *Bucket::getChunk(bool &FromPool) {
     std::lock_guard<std::mutex> Lg(BucketLock);
 
-    auto SlabIt = getAvailSlab(FromPool);
-    auto *FreeChunk = slab_get_chunk((*SlabIt));
+    slab_list_item_t *slab_it = getAvailSlab(FromPool);
+    auto *FreeChunk = slab_get_chunk(slab_it->val);
 
     // If the slab is full, move it to unavailable slabs and update its iterator
-    if (!(slab_has_avail(*SlabIt))) {
-        auto It = UnavailableSlabs.insert(UnavailableSlabs.begin(), *SlabIt);
-        AvailableSlabs.erase(SlabIt);
-        slab_set_iterator(*It, &It);
+    if (!(slab_has_avail(slab_it->val))) {
+        DL_DELETE(AvailableSlabs, slab_it);
+        DL_PREPEND(UnavailableSlabs, slab_it);
     }
 
     return FreeChunk;
@@ -487,14 +482,10 @@ void Bucket::onFreeChunk(slab_t *slab, bool &ToPool) {
     // In case if the slab was previously full and now has 1 available
     // chunk, it should be moved to the list of available slabs
     if (slab_get_num_allocated(slab) == (slab_get_num_chunks(slab) - 1)) {
-        auto SlabIter =
-            *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
-        assert(SlabIter != UnavailableSlabs.end());
-
-        slab_t *slab = *SlabIter;
-        auto It = AvailableSlabs.insert(AvailableSlabs.begin(), slab);
-        UnavailableSlabs.erase(SlabIter);
-        slab_set_iterator(slab, &It);
+        slab_list_item_t *slab_it = slab->iter;
+        assert(slab_it->val != NULL);
+        DL_DELETE(UnavailableSlabs, slab_it);
+        DL_PREPEND(AvailableSlabs, slab_it);
     }
 
     // Check if slab is empty, and pool it if we can.
@@ -506,11 +497,11 @@ void Bucket::onFreeChunk(slab_t *slab, bool &ToPool) {
         if (!CanPool(ToPool)) {
             // Note: since the slab is stored as unique_ptr, just remove it from
             // the list to destroy the object.
-            auto It = *(std::list<slab_t *>::iterator *)slab_get_iterator(slab);
-            assert(It != AvailableSlabs.end());
-            slab_unreg(*It);
-            destroy_slab(*It);
-            AvailableSlabs.erase(It);
+            slab_list_item_t *slab_it = slab->iter;
+            assert(slab_it->val != NULL);
+            slab_unreg(slab_it->val);
+            DL_DELETE(AvailableSlabs, slab_it);
+            destroy_slab(slab_it->val);
         }
     }
 }
@@ -522,7 +513,11 @@ bool Bucket::CanPool(bool &ToPool) {
     if (chunkedBucket) {
         NewFreeSlabsInBucket = chunkedSlabsInPool + 1;
     } else {
-        NewFreeSlabsInBucket = AvailableSlabs.size() + 1;
+        // TODO optimize
+        size_t avail_num = 0;
+        slab_list_item_t *it = NULL;
+        DL_FOREACH(AvailableSlabs, it) { avail_num++; }
+        NewFreeSlabsInBucket = avail_num + 1;
     }
     if (Capacity() >= NewFreeSlabsInBucket) {
         size_t PoolSize = OwnAllocCtx.getLimits()->TotalSize;

@@ -7,6 +7,7 @@ void annotate_memory_inaccessible(void *ptr, size_t size);
 void annotate_memory_undefined(void *ptr, size_t size);
 
 typedef void *bucket_t;
+typedef struct slab_list_item_t slab_list_item_t;
 
 // Represents the allocated memory block of size 'slab_min_size'
 // Internally, it splits the memory block into chunks. The number of
@@ -34,11 +35,15 @@ typedef struct slab_t {
 
     // Store iterator to the corresponding node in avail/unavail list
     // to achieve O(1) removal
-    void *slab_list_iter;
-    size_t slab_list_iter_size;
+    slab_list_item_t *iter;
 } slab_t;
 
-slab_t *create_slab(bucket_t bucket, size_t iter_size);
+typedef struct slab_list_item_t {
+    slab_t *val;
+    struct slab_list_item_t *prev, *next;
+} slab_list_item_t;
+
+slab_t *create_slab(bucket_t bucket);
 void destroy_slab(slab_t *slab);
 
 void *slab_get(const slab_t *slab);
@@ -48,9 +53,6 @@ void *slab_get_chunk(slab_t *slab);
 size_t slab_get_num_chunks(const slab_t *slab);
 size_t slab_get_chunk_size(const slab_t *slab);
 size_t slab_get_num_allocated(const slab_t *slab);
-
-void *slab_get_iterator(const slab_t *slab);
-void slab_set_iterator(slab_t *slab, void *it);
 
 bool slab_has_avail(const slab_t *slab);
 void slab_free_chunk(slab_t *slab, void *ptr);

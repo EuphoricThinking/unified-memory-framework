@@ -58,7 +58,7 @@ umf_memory_provider_handle_t bucket_get_provider(const bucket_t bucket);
 void slab_reg(slab_t *slab);
 void slab_unreg(slab_t *slab);
 
-slab_t *create_slab(bucket_t bucket, size_t iter_size) {
+slab_t *create_slab(bucket_t bucket) {
     // In case bucket size is not a multiple of SlabMinSize, we would have
     // some padding at the end of the slab.
     slab_t *slab = umf_ba_global_alloc(sizeof(slab_t));
@@ -67,9 +67,11 @@ slab_t *create_slab(bucket_t bucket, size_t iter_size) {
     slab->num_allocated = 0;
     slab->first_free_chunk_idx = 0;
     slab->bucket = bucket;
-    slab->slab_list_iter = umf_ba_global_alloc(iter_size);
-    slab->slab_list_iter_size = iter_size;
-    memset(slab->slab_list_iter, 0, iter_size);
+
+    slab->iter =
+        (slab_list_item_t *)umf_ba_global_alloc(sizeof(slab_list_item_t));
+    slab->iter->val = slab;
+    slab->iter->prev = slab->iter->next = NULL;
 
     slab->num_chunks =
         bucket_get_slab_min_size(bucket) / bucket_get_size(bucket);
@@ -100,7 +102,7 @@ void destroy_slab(slab_t *slab) {
                                              slab->mem_ptr, slab->slab_size);
     assert(res == UMF_RESULT_SUCCESS);
     umf_ba_global_free(slab->chunks);
-    umf_ba_global_free(slab->slab_list_iter);
+    umf_ba_global_free(slab->iter);
     umf_ba_global_free(slab);
 }
 
@@ -171,7 +173,8 @@ void slab_free_chunk(slab_t *slab, void *ptr) {
 
     // Even if the pointer p was previously aligned, it's still inside the
     // corresponding chunk, so we get the correct index here.
-    size_t chunk_idx = (ptr - slab->mem_ptr) / slab_get_chunk_size(slab);
+    size_t chunk_idx =
+        ((uint8_t *)ptr - (uint8_t *)slab->mem_ptr) / slab_get_chunk_size(slab);
 
     // Make sure that the chunk was allocated
     assert(slab->chunks[chunk_idx] && "double free detected");
@@ -190,11 +193,6 @@ void slab_free_chunk(slab_t *slab, void *ptr) {
 
 bool slab_has_avail(const slab_t *slab) {
     return slab->num_allocated != slab->num_chunks;
-}
-
-void *slab_get_iterator(const slab_t *slab) { return slab->slab_list_iter; }
-void slab_set_iterator(slab_t *slab, void *it) {
-    memcpy(slab->slab_list_iter, it, slab->slab_list_iter_size);
 }
 
 #ifdef __cplusplus
