@@ -180,9 +180,9 @@ class DisjointPool::AllocImpl {
         // Powers of 2 and the value halfway between the powers of 2.
         auto Size1 = this->params.MinBucketSize;
         // MinBucketSize cannot be larger than CutOff.
-        Size1 = std::min(Size1, CutOff);
+        Size1 = utils_min(Size1, CutOff);
         // Buckets sized smaller than the bucket default size- 8 aren't needed.
-        Size1 = std::max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
+        Size1 = utils_max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
         // Calculate the exponent for MinBucketSize used for finding buckets.
         MinBucketSizeExp = (size_t)log2Utils(Size1);
         auto Size2 = Size1 + Size1 / 2;
@@ -387,11 +387,13 @@ void bucket_update_stats(bucket_t *bucket, int InUse, int InPool) {
         return;
     }
     bucket->currSlabsInUse += InUse;
+
     bucket->maxSlabsInUse =
-        std::max(bucket->currSlabsInUse, bucket->maxSlabsInUse);
+        utils_max(bucket->currSlabsInUse, bucket->maxSlabsInUse);
     bucket->currSlabsInPool += InPool;
     bucket->maxSlabsInPool =
-        std::max(bucket->currSlabsInPool, bucket->maxSlabsInPool);
+        utils_max(bucket->currSlabsInPool, bucket->maxSlabsInPool);
+
     // Increment or decrement current pool sizes based on whether
     // slab was added to or removed from pool.
     bucket_get_params(bucket)->CurPoolSize +=
@@ -605,10 +607,10 @@ void DisjointPool::AllocImpl::printStats(bool &TitlePrinted,
         //(*B).printStats(TitlePrinted, MTName);
         bucket_t *bucket = B;
         HighPeakSlabsInUse =
-            std::max(bucket->maxSlabsInUse, HighPeakSlabsInUse);
+            utils_max(bucket->maxSlabsInUse, HighPeakSlabsInUse);
         if ((*B).allocCount) {
             HighBucketSize =
-                std::max(bucket_slab_alloc_size(bucket), HighBucketSize);
+                utils_max(bucket_slab_alloc_size(bucket), HighBucketSize);
         }
     }
 }

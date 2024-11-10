@@ -153,6 +153,10 @@ int utils_file_open_or_create(const char *path);
 
 int utils_fallocate(int fd, long offset, long len);
 
+size_t utils_max(size_t a, size_t b);
+
+size_t utils_min(size_t a, size_t b);
+
 #ifdef __cplusplus
 }
 #endif
