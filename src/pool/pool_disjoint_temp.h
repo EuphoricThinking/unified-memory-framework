@@ -109,25 +109,31 @@ void slab_reg_by_addr(void *addr, slab_t *slab);
 void slab_unreg(slab_t *slab);
 void slab_unreg_by_addr(void *addr, slab_t *slab);
 
+bucket_t *create_bucket(size_t sz, void *alloc_ctx);
+void destroy_bucket(bucket_t *bucket);
+
 void bucket_update_stats(bucket_t *bucket, int in_use, int in_pool);
-size_t bucket_slab_alloc_size(bucket_t *bucket);
 bool bucket_can_pool(bucket_t *bucket, bool *to_pool);
 void bucket_on_free_chunk(bucket_t *bucket, slab_t *slab, bool *to_pool);
 void bucket_decrement_pool(bucket_t *bucket, bool *from_pool);
 void *bucket_get_chunk(bucket_t *bucket, bool *from_pool);
-void *bucket_get_slab(bucket_t *bucket, bool *from_pool);
 size_t bucket_get_size(bucket_t *bucket);
 size_t bucket_chunk_cut_off(bucket_t *bucket);
 size_t bucket_capacity(bucket_t *bucket);
-size_t bucket_slab_min_size(bucket_t *bucket);
-void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *Slab,
+void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *slab,
                        bool *to_pool);
 void bucket_count_alloc(bucket_t *bucket, bool from_pool);
 void bucket_count_free(bucket_t *bucket);
 
+void *bucket_get_slab(bucket_t *bucket, bool *from_pool);
+size_t bucket_slab_alloc_size(bucket_t *bucket);
+size_t bucket_slab_min_size(bucket_t *bucket);
+slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool);
+slab_list_item_t *bucket_get_avail_full_slab(bucket_t *bucket, bool *from_pool);
+void bucket_free_slab(bucket_t *bucket, slab_t *slab, bool *to_pool);
+
 umf_disjoint_pool_shared_limits_t *bucket_get_limits(bucket_t *bucket);
 umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket);
 umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket);
-slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool);
 
 #endif // TEMP_H
