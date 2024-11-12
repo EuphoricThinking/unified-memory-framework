@@ -44,8 +44,6 @@ extern "C" {
 
 #include "pool_disjoint_temp.h"
 
-struct slab_t;
-
 #ifdef __cplusplus
 }
 #endif
@@ -111,7 +109,9 @@ class DisjointPool::AllocImpl {
     // It's important for the map to be destroyed last after buckets and their
     // slabs This is because slab's destructor removes the object from the map.
     std::unordered_multimap<void *, slab_t *> KnownSlabs;
-    std::shared_timed_mutex KnownSlabsMapLock;
+
+    // prev std::shared_timed_mutex - ok?
+    utils_mutex_t known_slabs_map_lock;
 
     // Handle to the memory provider
     umf_memory_provider_handle_t MemHandle;
@@ -125,7 +125,7 @@ class DisjointPool::AllocImpl {
     umf_disjoint_pool_shared_limits_t *DefaultSharedLimits;
 
     // Used in algorithm for finding buckets
-    std::size_t MinBucketSizeExp;
+    size_t MinBucketSizeExp;
 
     // Coarse-grain allocation min alignment
     size_t ProviderMinPageSize;
@@ -137,6 +137,8 @@ class DisjointPool::AllocImpl {
 
         VALGRIND_DO_CREATE_MEMPOOL(this, 0, 0);
 
+        utils_mutex_init(&known_slabs_map_lock);
+
         // Generate buckets sized such as: 64, 96, 128, 192, ..., CutOff.
         // Powers of 2 and the value halfway between the powers of 2.
         auto Size1 = this->params.MinBucketSize;
@@ -147,6 +149,7 @@ class DisjointPool::AllocImpl {
         // Calculate the exponent for MinBucketSize used for finding buckets.
         MinBucketSizeExp = (size_t)log2Utils(Size1);
         DefaultSharedLimits = shared_limits_create(SIZE_MAX);
+
         auto Size2 = Size1 + Size1 / 2;
         for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2) {
             // TODO copy allocimpl
@@ -171,6 +174,8 @@ class DisjointPool::AllocImpl {
         }
 
         VALGRIND_DO_DESTROY_MEMPOOL(this);
+
+        utils_mutex_destroy_not_free(&known_slabs_map_lock);
     }
 
     void *allocate(size_t Size, size_t Alignment, bool &FromPool);
@@ -179,9 +184,7 @@ class DisjointPool::AllocImpl {
 
     umf_memory_provider_handle_t getMemHandle() { return MemHandle; }
 
-    std::shared_timed_mutex &getKnownSlabsMapLock() {
-        return KnownSlabsMapLock;
-    }
+    utils_mutex_t *getKnownSlabsMapLock() { return &known_slabs_map_lock; }
 
     std::unordered_multimap<void *, slab_t *> &getKnownSlabs() {
         return KnownSlabs;
@@ -204,7 +207,7 @@ class DisjointPool::AllocImpl {
 
   private:
     bucket_t *findBucket(size_t Size);
-    std::size_t sizeToIdx(size_t Size);
+    size_t sizeToIdx(size_t Size);
 };
 
 static void *memoryProviderAlloc(umf_memory_provider_handle_t hProvider,
@@ -398,9 +401,12 @@ bucket_t *DisjointPool::AllocImpl::findBucket(size_t Size) {
     auto calculatedIdx = sizeToIdx(Size);
     bucket_t *bucket = Buckets[calculatedIdx];
     assert(bucket_get_size(bucket) >= Size);
+    (void)bucket;
+
     if (calculatedIdx > 0) {
         bucket_t *bucket_prev = Buckets[calculatedIdx - 1];
         assert(bucket_get_size(bucket_prev) < Size);
+        (void)bucket_prev;
     }
 
     return Buckets[calculatedIdx];
@@ -414,12 +420,12 @@ umf_result_t DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
     auto *SlabPtr = (void *)ALIGN_DOWN((size_t)Ptr, SlabMinSize());
 
     // Lock the map on read
-    std::shared_lock<std::shared_timed_mutex> Lk(getKnownSlabsMapLock());
+    utils_mutex_lock(getKnownSlabsMapLock());
 
     ToPool = false;
     auto Slabs = getKnownSlabs().equal_range(SlabPtr);
     if (Slabs.first == Slabs.second) {
-        Lk.unlock();
+        utils_mutex_unlock(getKnownSlabsMapLock());
         umf_result_t ret = memoryProviderFree(getMemHandle(), Ptr);
         return ret;
     }
@@ -431,7 +437,7 @@ umf_result_t DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
         if (Ptr >= slab_get(Slab) && Ptr < slab_get_end(Slab)) {
             // Unlock the map before freeing the chunk, it may be locked on write
             // there
-            Lk.unlock();
+            utils_mutex_unlock(getKnownSlabsMapLock());
             bucket_t *bucket = slab_get_bucket(Slab);
 
             if (getParams().PoolTrace > 1) {
@@ -450,7 +456,7 @@ umf_result_t DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
         }
     }
 
-    Lk.unlock();
+    utils_mutex_unlock(getKnownSlabsMapLock());
     // There is a rare case when we have a pointer from system allocation next
     // to some slab with an entry in the map. So we find a slab
     // but the range checks fail.
@@ -608,11 +614,6 @@ umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket) {
     return &t->getParams();
 }
 
-umf_disjoint_pool_shared_limits_t *bucket_get_limits(bucket_t *bucket) {
-    auto t = (DisjointPool::AllocImpl *)bucket->OwnAllocCtx;
-    return t->getLimits();
-}
-
 umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket) {
     auto t = (DisjointPool::AllocImpl *)bucket->OwnAllocCtx;
     return t->getMemHandle();
@@ -624,9 +625,9 @@ bucket_get_known_slabs(bucket_t *bucket) {
     return &t->getKnownSlabs();
 }
 
-std::shared_timed_mutex *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
+utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
     auto t = (DisjointPool::AllocImpl *)bucket->OwnAllocCtx;
-    return &t->getKnownSlabsMapLock();
+    return t->getKnownSlabsMapLock();
 }
 
 void slab_reg_by_addr(void *addr, slab_t *slab) {
@@ -634,8 +635,9 @@ void slab_reg_by_addr(void *addr, slab_t *slab) {
     auto Lock = bucket_get_known_slabs_map_lock(bucket);
     auto Map = bucket_get_known_slabs(bucket);
 
-    std::lock_guard<std::shared_timed_mutex> Lg(*Lock);
+    utils_mutex_lock(Lock);
     Map->insert({addr, slab});
+    utils_mutex_unlock(Lock);
 }
 
 void slab_unreg_by_addr(void *addr, slab_t *slab) {
@@ -643,7 +645,7 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
     auto Lock = bucket_get_known_slabs_map_lock(bucket);
     auto Map = bucket_get_known_slabs(bucket);
 
-    std::lock_guard<std::shared_timed_mutex> Lg(*Lock);
+    utils_mutex_lock(Lock);
 
     auto Slabs = Map->equal_range(addr);
     // At least the must get the current slab from the map.
@@ -652,11 +654,13 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
     for (auto It = Slabs.first; It != Slabs.second; ++It) {
         if (It->second == slab) {
             Map->erase(It);
+            utils_mutex_unlock(Lock);
             return;
         }
     }
 
     assert(false && "Slab is not found");
+    utils_mutex_unlock(Lock);
 }
 
 #ifdef __cplusplus

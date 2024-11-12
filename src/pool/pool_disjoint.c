@@ -53,7 +53,7 @@ extern "C" {
 
 typedef struct umf_disjoint_pool_shared_limits_t {
     size_t max_size;
-    _Atomic(size_t) total_size;
+    size_t total_size; // requires atomic access
 } umf_disjoint_pool_shared_limits_t;
 
 umf_disjoint_pool_shared_limits_t *shared_limits_create(size_t max_size) {
