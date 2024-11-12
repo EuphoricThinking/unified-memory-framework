@@ -35,6 +35,8 @@
 #include "utils_math.h"
 #include "utils_sanitizers.h"
 
+#include "utils_concurrency.h"
+
 // TODO remove
 #ifdef __cplusplus
 extern "C" {
@@ -48,11 +50,6 @@ struct slab_t;
 }
 #endif
 // end TODO remove
-
-typedef struct umf_disjoint_pool_shared_limits_t {
-    size_t MaxSize;
-    std::atomic<size_t> TotalSize;
-} umf_disjoint_pool_shared_limits_t;
 
 class DisjointPool {
   public:
@@ -78,12 +75,12 @@ class DisjointPool {
 
 umf_disjoint_pool_shared_limits_t *
 umfDisjointPoolSharedLimitsCreate(size_t MaxSize) {
-    return new umf_disjoint_pool_shared_limits_t{MaxSize, 0};
+    return shared_limits_create(MaxSize);
 }
 
 void umfDisjointPoolSharedLimitsDestroy(
     umf_disjoint_pool_shared_limits_t *limits) {
-    delete limits;
+    shared_limits_destroy(limits);
 }
 
 // Allocations are a minimum of 4KB/64KB/2MB even when a smaller size is
@@ -125,8 +122,7 @@ class DisjointPool::AllocImpl {
     // Configuration for this instance
     umf_disjoint_pool_params_t params;
 
-    umf_disjoint_pool_shared_limits_t DefaultSharedLimits = {
-        (std::numeric_limits<size_t>::max)(), 0};
+    umf_disjoint_pool_shared_limits_t *DefaultSharedLimits;
 
     // Used in algorithm for finding buckets
     std::size_t MinBucketSizeExp;
@@ -150,13 +146,14 @@ class DisjointPool::AllocImpl {
         Size1 = std::max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
         // Calculate the exponent for MinBucketSize used for finding buckets.
         MinBucketSizeExp = (size_t)log2Utils(Size1);
+        DefaultSharedLimits = shared_limits_create(SIZE_MAX);
         auto Size2 = Size1 + Size1 / 2;
         for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2) {
             // TODO copy allocimpl
-            Buckets.push_back(create_bucket(Size1, this));
-            Buckets.push_back(create_bucket(Size2, this));
+            Buckets.push_back(create_bucket(Size1, this, this->getLimits()));
+            Buckets.push_back(create_bucket(Size2, this, this->getLimits()));
         }
-        Buckets.push_back(create_bucket(CutOff, this));
+        Buckets.push_back(create_bucket(CutOff, this, this->getLimits()));
 
         auto ret = umfMemoryProviderGetMinPageSize(hProvider, nullptr,
                                                    &ProviderMinPageSize);
@@ -166,6 +163,8 @@ class DisjointPool::AllocImpl {
     }
 
     ~AllocImpl() {
+        // TODO
+        // destroy DefaultSharedLimits
 
         for (auto it = Buckets.begin(); it != Buckets.end(); it++) {
             destroy_bucket(*it);
@@ -196,7 +195,7 @@ class DisjointPool::AllocImpl {
         if (params.SharedLimits) {
             return params.SharedLimits;
         } else {
-            return &DefaultSharedLimits;
+            return DefaultSharedLimits;
         }
     };
 
@@ -253,14 +252,6 @@ std::ostream &operator<<(std::ostream &Os, slab_t &Slab) {
     return Os;
 }
 */
-
-// If a slab was available in the pool then note that the current pooled
-// size has reduced by the size of a slab in this bucket.
-void bucket_decrement_pool(bucket_t *bucket, bool *FromPool) {
-    *FromPool = true;
-    bucket_update_stats(bucket, 1, -1);
-    bucket_get_limits(bucket)->TotalSize -= bucket_slab_alloc_size(bucket);
-}
 
 /*
 void Bucket::printStats(bool &TitlePrinted, const std::string &Label) {
@@ -553,7 +544,7 @@ size_t DisjointPool::malloc_usable_size(void *) {
 umf_result_t DisjointPool::free(void *ptr) {
     bool ToPool;
     umf_result_t ret = impl->deallocate(ptr, ToPool);
-
+    /*
     if (ret == UMF_RESULT_SUCCESS) {
 
         if (impl->getParams().PoolTrace > 2) {
@@ -565,7 +556,7 @@ umf_result_t DisjointPool::free(void *ptr) {
                       << ", Current pool size for " << MT << " "
                       << impl->getParams().CurPoolSize << "\n";
         }
-    }
+    }*/
     return ret;
 }
 
@@ -577,10 +568,11 @@ DisjointPool::DisjointPool() {}
 
 // Define destructor for use with unique_ptr
 DisjointPool::~DisjointPool() {
-    bool TitlePrinted = false;
-    size_t HighBucketSize;
-    size_t HighPeakSlabsInUse;
+    /*
     if (impl->getParams().PoolTrace > 1) {
+        bool TitlePrinted = false;
+        size_t HighBucketSize;
+        size_t HighPeakSlabsInUse;
         auto name = impl->getParams().Name;
         //try { // cannot throw in destructor
         impl->printStats(TitlePrinted, HighBucketSize, HighPeakSlabsInUse,
@@ -596,6 +588,7 @@ DisjointPool::~DisjointPool() {
         //} catch (...) { // ignore exceptions
         // }
     }
+    */
 }
 
 static umf_memory_pool_ops_t UMF_DISJOINT_POOL_OPS =
@@ -664,47 +657,6 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
     }
 
     assert(false && "Slab is not found");
-}
-
-bool bucket_can_pool(bucket_t *bucket, bool *ToPool) {
-    size_t NewFreeSlabsInBucket;
-    // Check if this bucket is used in chunked form or as full slabs.
-    bool chunkedBucket =
-        bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket);
-    if (chunkedBucket) {
-        NewFreeSlabsInBucket = bucket->chunkedSlabsInPool + 1;
-    } else {
-        // TODO optimize
-        size_t avail_num = 0;
-        slab_list_item_t *it = NULL;
-        DL_FOREACH(bucket->AvailableSlabs, it) { avail_num++; }
-        NewFreeSlabsInBucket = avail_num + 1;
-    }
-    if (bucket_capacity(bucket) >= NewFreeSlabsInBucket) {
-        size_t PoolSize = bucket_get_limits(bucket)->TotalSize;
-        while (true) {
-            size_t NewPoolSize = PoolSize + bucket_slab_alloc_size(bucket);
-
-            if (bucket_get_limits(bucket)->MaxSize < NewPoolSize) {
-                break;
-            }
-
-            if (bucket_get_limits(bucket)->TotalSize.compare_exchange_strong(
-                    PoolSize, NewPoolSize)) {
-                if (chunkedBucket) {
-                    ++bucket->chunkedSlabsInPool;
-                }
-
-                bucket_update_stats(bucket, -1, 1);
-                *ToPool = true;
-                return true;
-            }
-        }
-    }
-
-    bucket_update_stats(bucket, -1, 0);
-    *ToPool = false;
-    return false;
 }
 
 #ifdef __cplusplus

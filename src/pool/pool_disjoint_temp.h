@@ -6,6 +6,9 @@
 void annotate_memory_inaccessible(void *ptr, size_t size);
 void annotate_memory_undefined(void *ptr, size_t size);
 
+umf_disjoint_pool_shared_limits_t *shared_limits_create(size_t max_size);
+void shared_limits_destroy(umf_disjoint_pool_shared_limits_t *shared_limits);
+
 typedef struct slab_list_item_t slab_list_item_t;
 
 typedef struct bucket_t {
@@ -23,6 +26,8 @@ typedef struct bucket_t {
     // Reference to the allocator context, used access memory allocation
     // routines, slab map and etc.
     void *OwnAllocCtx;
+
+    umf_disjoint_pool_shared_limits_t *shared_limits;
 
     // For buckets used in chunked mode, a counter of slabs in the pool.
     // For allocations that use an entire slab each, the entries in the Available
@@ -109,7 +114,8 @@ void slab_reg_by_addr(void *addr, slab_t *slab);
 void slab_unreg(slab_t *slab);
 void slab_unreg_by_addr(void *addr, slab_t *slab);
 
-bucket_t *create_bucket(size_t sz, void *alloc_ctx);
+bucket_t *create_bucket(size_t sz, void *alloc_ctx,
+                        umf_disjoint_pool_shared_limits_t *shared_limits);
 void destroy_bucket(bucket_t *bucket);
 
 void bucket_update_stats(bucket_t *bucket, int in_use, int in_pool);

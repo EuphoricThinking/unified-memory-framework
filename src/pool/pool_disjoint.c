@@ -51,6 +51,23 @@ extern "C" {
 #endif
 }
 
+typedef struct umf_disjoint_pool_shared_limits_t {
+    size_t max_size;
+    _Atomic(size_t) total_size;
+} umf_disjoint_pool_shared_limits_t;
+
+umf_disjoint_pool_shared_limits_t *shared_limits_create(size_t max_size) {
+    umf_disjoint_pool_shared_limits_t *ptr =
+        umf_ba_global_alloc(sizeof(umf_disjoint_pool_shared_limits_t));
+    ptr->max_size = max_size;
+    ptr->total_size = 0;
+    return ptr;
+}
+
+void shared_limits_destroy(umf_disjoint_pool_shared_limits_t *shared_limits) {
+    umf_ba_global_free(shared_limits);
+}
+
 size_t bucket_get_size(bucket_t *bucket);
 
 void slab_reg(slab_t *slab);
@@ -212,7 +229,8 @@ void slab_unreg(slab_t *slab) {
     slab_unreg_by_addr(end_addr, slab);
 }
 
-bucket_t *create_bucket(size_t Sz, void *AllocCtx) {
+bucket_t *create_bucket(size_t Sz, void *AllocCtx,
+                        umf_disjoint_pool_shared_limits_t *shared_limits) {
     bucket_t *bucket = (bucket_t *)umf_ba_global_alloc(sizeof(bucket_t));
 
     bucket->Size = Sz;
@@ -227,6 +245,9 @@ bucket_t *create_bucket(size_t Sz, void *AllocCtx) {
     bucket->maxSlabsInPool = 0;
     bucket->allocCount = 0;
     bucket->maxSlabsInUse = 0;
+
+    bucket->shared_limits = shared_limits;
+    assert(shared_limits);
 
     utils_mutex_init(&bucket->bucket_lock);
 
@@ -451,6 +472,56 @@ void bucket_update_stats(bucket_t *bucket, int in_use, int in_pool) {
     // slab was added to or removed from pool.
     bucket_get_params(bucket)->CurPoolSize +=
         in_pool * bucket_slab_alloc_size(bucket);
+}
+
+// If a slab was available in the pool then note that the current pooled
+// size has reduced by the size of a slab in this bucket.
+void bucket_decrement_pool(bucket_t *bucket, bool *from_pool) {
+    *from_pool = true;
+    bucket_update_stats(bucket, 1, -1);
+    utils_fetch_and_add64(&bucket->shared_limits->total_size,
+                          -bucket_slab_alloc_size(bucket));
+}
+
+bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
+    size_t NewFreeSlabsInBucket;
+    // Check if this bucket is used in chunked form or as full slabs.
+    bool chunkedBucket =
+        bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket);
+    if (chunkedBucket) {
+        NewFreeSlabsInBucket = bucket->chunkedSlabsInPool + 1;
+    } else {
+        // TODO optimize
+        size_t avail_num = 0;
+        slab_list_item_t *it = NULL;
+        DL_FOREACH(bucket->AvailableSlabs, it) { avail_num++; }
+        NewFreeSlabsInBucket = avail_num + 1;
+    }
+    if (bucket_capacity(bucket) >= NewFreeSlabsInBucket) {
+        size_t pool_size = bucket->shared_limits->total_size;
+        while (true) {
+            size_t new_pool_size = pool_size + bucket_slab_alloc_size(bucket);
+
+            if (bucket->shared_limits->max_size < new_pool_size) {
+                break;
+            }
+
+            if (utils_compare_exchange(&bucket->shared_limits->total_size,
+                                       &pool_size, &new_pool_size)) {
+                if (chunkedBucket) {
+                    ++bucket->chunkedSlabsInPool;
+                }
+
+                bucket_update_stats(bucket, -1, 1);
+                *to_pool = true;
+                return true;
+            }
+        }
+    }
+
+    bucket_update_stats(bucket, -1, 0);
+    *to_pool = false;
+    return false;
 }
 
 #ifdef __cplusplus
