@@ -31,11 +31,12 @@
 #include "pool_disjoint.h"
 #include "umf.h"
 #include "utils_common.h"
+#include "utils_concurrency.h"
 #include "utils_log.h"
 #include "utils_math.h"
 #include "utils_sanitizers.h"
 
-#include "utils_concurrency.h"
+#include "critnib/critnib.h"
 
 // TODO remove
 #ifdef __cplusplus
@@ -108,7 +109,7 @@ typedef struct MemoryProviderError {
 class DisjointPool::AllocImpl {
     // It's important for the map to be destroyed last after buckets and their
     // slabs This is because slab's destructor removes the object from the map.
-    std::unordered_multimap<void *, slab_t *> KnownSlabs;
+    critnib *known_slabs; // (void *, slab_t *)
 
     // prev std::shared_timed_mutex - ok?
     utils_mutex_t known_slabs_map_lock;
@@ -139,6 +140,7 @@ class DisjointPool::AllocImpl {
         VALGRIND_DO_CREATE_MEMPOOL(this, 0, 0);
 
         utils_mutex_init(&known_slabs_map_lock);
+        known_slabs = critnib_new();
 
         // Generate buckets sized such as: 64, 96, 128, 192, ..., CutOff.
         // Powers of 2 and the value halfway between the powers of 2.
@@ -190,6 +192,8 @@ class DisjointPool::AllocImpl {
 
         VALGRIND_DO_DESTROY_MEMPOOL(this);
 
+        critnib_delete(known_slabs);
+
         utils_mutex_destroy_not_free(&known_slabs_map_lock);
     }
 
@@ -201,9 +205,7 @@ class DisjointPool::AllocImpl {
 
     utils_mutex_t *getKnownSlabsMapLock() { return &known_slabs_map_lock; }
 
-    std::unordered_multimap<void *, slab_t *> &getKnownSlabs() {
-        return KnownSlabs;
-    }
+    critnib *getKnownSlabs() { return known_slabs; }
 
     size_t SlabMinSize() { return params.SlabMinSize; };
 
@@ -438,38 +440,41 @@ umf_result_t DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
     utils_mutex_lock(getKnownSlabsMapLock());
 
     ToPool = false;
-    auto Slabs = getKnownSlabs().equal_range(SlabPtr);
-    if (Slabs.first == Slabs.second) {
+
+    slab_t *slab = (slab_t *)critnib_get(known_slabs, (uintptr_t)SlabPtr);
+    //auto Slabs = getKnownSlabs().equal_range(SlabPtr);
+    if (slab == NULL) {
         utils_mutex_unlock(getKnownSlabsMapLock());
         umf_result_t ret = memoryProviderFree(getMemHandle(), Ptr);
         return ret;
     }
 
-    for (auto It = Slabs.first; It != Slabs.second; ++It) {
-        // The slab object won't be deleted until it's removed from the map which is
-        // protected by the lock, so it's safe to access it here.
-        auto &Slab = It->second;
-        if (Ptr >= slab_get(Slab) && Ptr < slab_get_end(Slab)) {
-            // Unlock the map before freeing the chunk, it may be locked on write
-            // there
-            utils_mutex_unlock(getKnownSlabsMapLock());
-            bucket_t *bucket = slab_get_bucket(Slab);
+    // TODO - no multimap
+    // for (auto It = Slabs.first; It != Slabs.second; ++It) {
 
-            if (getParams().PoolTrace > 1) {
-                bucket_count_free(bucket);
-            }
+    // The slab object won't be deleted until it's removed from the map which is
+    // protected by the lock, so it's safe to access it here.
+    if (Ptr >= slab_get(slab) && Ptr < slab_get_end(slab)) {
+        // Unlock the map before freeing the chunk, it may be locked on write
+        // there
+        utils_mutex_unlock(getKnownSlabsMapLock());
+        bucket_t *bucket = slab_get_bucket(slab);
 
-            VALGRIND_DO_MEMPOOL_FREE(this, Ptr);
-            annotate_memory_inaccessible(Ptr, bucket_get_size(bucket));
-            if (bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket)) {
-                bucket_free_chunk(bucket, Ptr, Slab, &ToPool);
-            } else {
-                bucket_free_slab(bucket, Slab, &ToPool);
-            }
-
-            return UMF_RESULT_SUCCESS;
+        if (getParams().PoolTrace > 1) {
+            bucket_count_free(bucket);
         }
+
+        VALGRIND_DO_MEMPOOL_FREE(this, Ptr);
+        annotate_memory_inaccessible(Ptr, bucket_get_size(bucket));
+        if (bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket)) {
+            bucket_free_chunk(bucket, Ptr, slab, &ToPool);
+        } else {
+            bucket_free_slab(bucket, slab, &ToPool);
+        }
+
+        return UMF_RESULT_SUCCESS;
     }
+    //} // for multimap
 
     utils_mutex_unlock(getKnownSlabsMapLock());
     // There is a rare case when we have a pointer from system allocation next
@@ -634,10 +639,9 @@ umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket) {
     return t->getMemHandle();
 }
 
-std::unordered_multimap<void *, slab_t *> *
-bucket_get_known_slabs(bucket_t *bucket) {
+critnib *bucket_get_known_slabs(bucket_t *bucket) {
     auto t = (DisjointPool::AllocImpl *)bucket->OwnAllocCtx;
-    return &t->getKnownSlabs();
+    return t->getKnownSlabs();
 }
 
 utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
@@ -647,35 +651,33 @@ utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
 
 void slab_reg_by_addr(void *addr, slab_t *slab) {
     bucket_t *bucket = slab_get_bucket(slab);
-    auto Lock = bucket_get_known_slabs_map_lock(bucket);
-    auto Map = bucket_get_known_slabs(bucket);
+    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
+    critnib *slabs = bucket_get_known_slabs(bucket);
 
-    utils_mutex_lock(Lock);
-    Map->insert({addr, slab});
-    utils_mutex_unlock(Lock);
+    utils_mutex_lock(lock);
+
+    // TODO multimap
+    assert(critnib_get(slabs, (uintptr_t)addr) == NULL);
+    critnib_insert(slabs, (uintptr_t)addr, slab, 0);
+
+    utils_mutex_unlock(lock);
 }
 
 void slab_unreg_by_addr(void *addr, slab_t *slab) {
     bucket_t *bucket = slab_get_bucket(slab);
-    auto Lock = bucket_get_known_slabs_map_lock(bucket);
-    auto Map = bucket_get_known_slabs(bucket);
+    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
+    critnib *slabs = bucket_get_known_slabs(bucket);
 
-    utils_mutex_lock(Lock);
+    utils_mutex_lock(lock);
 
-    auto Slabs = Map->equal_range(addr);
-    // At least the must get the current slab from the map.
-    assert(Slabs.first != Slabs.second && "Slab is not found");
+    // debug only
+    // assume single-value per key
+    slab_t *known_slab = (slab_t *)critnib_get(slabs, (uintptr_t)addr);
+    assert(known_slab != NULL && "Slab is not found");
+    assert(slab == known_slab);
+    critnib_remove(slabs, (uintptr_t)addr);
 
-    for (auto It = Slabs.first; It != Slabs.second; ++It) {
-        if (It->second == slab) {
-            Map->erase(It);
-            utils_mutex_unlock(Lock);
-            return;
-        }
-    }
-
-    assert(false && "Slab is not found");
-    utils_mutex_unlock(Lock);
+    utils_mutex_unlock(lock);
 }
 
 #ifdef __cplusplus
