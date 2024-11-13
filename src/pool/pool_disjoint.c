@@ -93,8 +93,12 @@ slab_t *create_slab(bucket_t *bucket) {
     memset(slab->chunks, 0, sizeof(bool) * slab->num_chunks);
 
     slab->slab_size = bucket_slab_alloc_size(bucket);
-    umf_result_t res = umfMemoryProviderAlloc(
-        bucket_get_mem_handle(bucket), slab->slab_size, 0, &slab->mem_ptr);
+
+    // NOTE: originally slabs memory were allocated without alignment
+    // with this registering a slab is simpler and doesn't require multimap
+    umf_result_t res =
+        umfMemoryProviderAlloc(bucket_get_mem_handle(bucket), slab->slab_size,
+                               bucket_slab_min_size(bucket), &slab->mem_ptr);
 
     if (res == UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY) {
         destroy_slab(slab);
@@ -115,6 +119,8 @@ void destroy_slab(slab_t *slab) {
     umf_result_t res = umfMemoryProviderFree(
         bucket_get_mem_handle(slab->bucket), slab->mem_ptr, slab->slab_size);
     assert(res == UMF_RESULT_SUCCESS);
+    (void)res;
+
     umf_ba_global_free(slab->chunks);
     umf_ba_global_free(slab->iter);
     umf_ba_global_free(slab);
@@ -211,9 +217,14 @@ bool slab_has_avail(const slab_t *slab) {
 
 void slab_reg(slab_t *slab) {
     bucket_t *bucket = slab_get_bucket(slab);
+    // NOTE: changed vs original - slab is already aligned to bucket_slab_min_size
+    // I also decr end_addr by 1
     void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
                                           bucket_slab_min_size(bucket));
-    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket);
+    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket) - 1;
+
+    fprintf(stderr, "[DP slab_reg] slab: %p, start: %p, end %p\n", (void *)slab,
+            start_addr, end_addr);
 
     slab_reg_by_addr(start_addr, slab);
     slab_reg_by_addr(end_addr, slab);
@@ -221,9 +232,14 @@ void slab_reg(slab_t *slab) {
 
 void slab_unreg(slab_t *slab) {
     bucket_t *bucket = slab_get_bucket(slab);
+    // NOTE: changed vs original - slab is already aligned to bucket_slab_min_size
+    // I also decr end_addr by 1
     void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
                                           bucket_slab_min_size(bucket));
-    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket);
+    void *end_addr = (uint8_t *)(start_addr) + bucket_slab_min_size(bucket) - 1;
+
+    fprintf(stderr, "[DP slab_unreg] slab: %p, start: %p, end %p\n",
+            (void *)slab, start_addr, end_addr);
 
     slab_unreg_by_addr(start_addr, slab);
     slab_unreg_by_addr(end_addr, slab);
@@ -485,6 +501,7 @@ void bucket_decrement_pool(bucket_t *bucket, bool *from_pool) {
 
 bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
     size_t NewFreeSlabsInBucket;
+
     // Check if this bucket is used in chunked form or as full slabs.
     bool chunkedBucket =
         bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket);
@@ -497,6 +514,7 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
         DL_FOREACH(bucket->AvailableSlabs, it) { avail_num++; }
         NewFreeSlabsInBucket = avail_num + 1;
     }
+
     if (bucket_capacity(bucket) >= NewFreeSlabsInBucket) {
         size_t pool_size = bucket->shared_limits->total_size;
         while (true) {

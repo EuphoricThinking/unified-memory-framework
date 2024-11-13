@@ -94,7 +94,7 @@ static __inline unsigned char utils_mssb_index(long long value) {
     InterlockedExchangeAdd64((LONG64 *)(ptr), value)
 
 #define utils_compare_exchange(object, expected, desired)                      \
-    InterlockedCompareExchange64((LONG64 volatile *)object, expected, desired)
+    InterlockedCompareExchange64((LONG64 volatile *)object, *expected, *desired)
 
 #else // !defined(_WIN32)
 
