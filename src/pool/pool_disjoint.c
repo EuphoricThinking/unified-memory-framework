@@ -480,7 +480,7 @@ void bucket_decrement_pool(bucket_t *bucket, bool *from_pool) {
     *from_pool = true;
     bucket_update_stats(bucket, 1, -1);
     utils_fetch_and_add64(&bucket->shared_limits->total_size,
-                          -bucket_slab_alloc_size(bucket));
+                          -(long long)bucket_slab_alloc_size(bucket));
 }
 
 bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
