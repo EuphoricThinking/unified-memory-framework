@@ -93,6 +93,9 @@ static __inline unsigned char utils_mssb_index(long long value) {
 #define utils_fetch_and_add64(ptr, value)                                      \
     InterlockedExchangeAdd64((LONG64 *)(ptr), value)
 
+#define utils_compare_exchange(object, expected, desired)                      \
+    InterlockedCompareExchange64((LONG64 volatile *)object, expected, desired)
+
 #else // !defined(_WIN32)
 
 #define utils_lssb_index(x) ((unsigned char)__builtin_ctzll(x))
