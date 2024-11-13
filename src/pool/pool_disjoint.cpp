@@ -117,7 +117,8 @@ class DisjointPool::AllocImpl {
     umf_memory_provider_handle_t MemHandle;
 
     // Store as unique_ptrs since Bucket is not Movable(because of std::mutex)
-    std::vector<bucket_t *> Buckets;
+    bucket_t **buckets;
+    size_t buckets_num;
 
     // Configuration for this instance
     umf_disjoint_pool_params_t params;
@@ -141,22 +142,36 @@ class DisjointPool::AllocImpl {
 
         // Generate buckets sized such as: 64, 96, 128, 192, ..., CutOff.
         // Powers of 2 and the value halfway between the powers of 2.
-        auto Size1 = this->params.MinBucketSize;
+        size_t Size1 = this->params.MinBucketSize;
+
         // MinBucketSize cannot be larger than CutOff.
         Size1 = std::min(Size1, CutOff);
+
         // Buckets sized smaller than the bucket default size- 8 aren't needed.
         Size1 = std::max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
+
         // Calculate the exponent for MinBucketSize used for finding buckets.
         MinBucketSizeExp = (size_t)log2Utils(Size1);
         DefaultSharedLimits = shared_limits_create(SIZE_MAX);
 
+        // count number of buckets, start from 1
+        buckets_num = 1;
         auto Size2 = Size1 + Size1 / 2;
+        size_t ts2 = Size2, ts1 = Size1;
         for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2) {
-            // TODO copy allocimpl
-            Buckets.push_back(create_bucket(Size1, this, this->getLimits()));
-            Buckets.push_back(create_bucket(Size2, this, this->getLimits()));
+            buckets_num += 2;
         }
-        Buckets.push_back(create_bucket(CutOff, this, this->getLimits()));
+        buckets =
+            (bucket_t **)umf_ba_global_alloc(sizeof(bucket_t *) * buckets_num);
+
+        int i = 0;
+        Size1 = ts1;
+        Size2 = ts2;
+        for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2, i += 2) {
+            buckets[i] = create_bucket(Size1, this, this->getLimits());
+            buckets[i + 1] = create_bucket(Size2, this, this->getLimits());
+        }
+        buckets[i] = create_bucket(CutOff, this, this->getLimits());
 
         auto ret = umfMemoryProviderGetMinPageSize(hProvider, nullptr,
                                                    &ProviderMinPageSize);
@@ -169,8 +184,8 @@ class DisjointPool::AllocImpl {
         // TODO
         // destroy DefaultSharedLimits
 
-        for (auto it = Buckets.begin(); it != Buckets.end(); it++) {
-            destroy_bucket(*it);
+        for (size_t i = 0; i < buckets_num; i++) {
+            destroy_bucket(buckets[i]);
         }
 
         VALGRIND_DO_DESTROY_MEMPOOL(this);
@@ -399,17 +414,17 @@ std::size_t DisjointPool::AllocImpl::sizeToIdx(size_t Size) {
 
 bucket_t *DisjointPool::AllocImpl::findBucket(size_t Size) {
     auto calculatedIdx = sizeToIdx(Size);
-    bucket_t *bucket = Buckets[calculatedIdx];
+    bucket_t *bucket = buckets[calculatedIdx];
     assert(bucket_get_size(bucket) >= Size);
     (void)bucket;
 
     if (calculatedIdx > 0) {
-        bucket_t *bucket_prev = Buckets[calculatedIdx - 1];
+        bucket_t *bucket_prev = buckets[calculatedIdx - 1];
         assert(bucket_get_size(bucket_prev) < Size);
         (void)bucket_prev;
     }
 
-    return Buckets[calculatedIdx];
+    return buckets[calculatedIdx];
 }
 
 umf_result_t DisjointPool::AllocImpl::deallocate(void *Ptr, bool &ToPool) {
@@ -473,15 +488,15 @@ void DisjointPool::AllocImpl::printStats(bool &TitlePrinted,
 
     HighBucketSize = 0;
     HighPeakSlabsInUse = 0;
-    for (auto &B : Buckets) {
+    for (size_t i = 0; i < buckets_num; i++) {
         // TODO
         //(*B).printStats(TitlePrinted, MTName);
-        bucket_t *bucket = B;
+        bucket_t *bucket = buckets[i];
         HighPeakSlabsInUse =
-            std::max(bucket->maxSlabsInUse, HighPeakSlabsInUse);
-        if ((*B).allocCount) {
+            utils_max(bucket->maxSlabsInUse, HighPeakSlabsInUse);
+        if (bucket->allocCount) {
             HighBucketSize =
-                std::max(bucket_slab_alloc_size(bucket), HighBucketSize);
+                utils_max(bucket_slab_alloc_size(bucket), HighBucketSize);
         }
     }
 }
