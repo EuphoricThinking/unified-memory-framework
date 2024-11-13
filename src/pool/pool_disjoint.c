@@ -22,6 +22,7 @@
 #include "utils_common.h"
 #include "utils_concurrency.h"
 #include "utils_log.h"
+#include "utils_math.h"
 #include "utils_sanitizers.h"
 
 #include "pool_disjoint_temp.h"
@@ -29,6 +30,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static size_t CutOff = (size_t)1 << 31; // 2GB
 
 // Temporary solution for disabling memory poisoning. This is needed because
 // AddressSanitizer does not support memory poisoning for GPU allocations.
@@ -526,8 +529,12 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
                 break;
             }
 
-            if (utils_compare_exchange(&bucket->shared_limits->total_size,
-                                       &pool_size, &new_pool_size)) {
+            // TODO!!!
+            //if (utils_compare_exchange(&bucket->shared_limits->total_size,
+            //                           pool_size, new_pool_size)) {
+            if (bucket->shared_limits->total_size != new_pool_size) {
+                bucket->shared_limits->total_size = new_pool_size;
+
                 if (chunkedBucket) {
                     ++bucket->chunkedSlabsInPool;
                 }
@@ -542,6 +549,26 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
     bucket_update_stats(bucket, -1, 0);
     *to_pool = false;
     return false;
+}
+
+umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket) {
+    AllocImpl *t = (AllocImpl *)bucket->OwnAllocCtx;
+    return AllocImpl_getParams(t);
+}
+
+umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket) {
+    AllocImpl *t = (AllocImpl *)bucket->OwnAllocCtx;
+    return AllocImpl_getMemHandle(t);
+}
+
+critnib *bucket_get_known_slabs(bucket_t *bucket) {
+    AllocImpl *t = (AllocImpl *)bucket->OwnAllocCtx;
+    return AllocImpl_getKnownSlabs(t);
+}
+
+utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
+    AllocImpl *t = (AllocImpl *)bucket->OwnAllocCtx;
+    return AllocImpl_getKnownSlabsMapLock(t);
 }
 
 void slab_reg_by_addr(void *addr, slab_t *slab) {
@@ -582,6 +609,93 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
     critnib_remove(slabs, (uintptr_t)addr);
 
     utils_mutex_unlock(lock);
+}
+
+AllocImpl *create_AllocImpl(umf_memory_provider_handle_t hProvider,
+                            umf_disjoint_pool_params_t *params) {
+
+    AllocImpl *ai = (AllocImpl *)umf_ba_global_alloc(sizeof(AllocImpl));
+
+    VALGRIND_DO_CREATE_MEMPOOL(ai, 0, 0);
+    ai->MemHandle = hProvider;
+    ai->params = *params;
+
+    utils_mutex_init(&ai->known_slabs_map_lock);
+    ai->known_slabs = critnib_new();
+
+    // Generate buckets sized such as: 64, 96, 128, 192, ..., CutOff.
+    // Powers of 2 and the value halfway between the powers of 2.
+    size_t Size1 = ai->params.MinBucketSize;
+
+    // MinBucketSize cannot be larger than CutOff.
+    Size1 = utils_min(Size1, CutOff);
+
+    // Buckets sized smaller than the bucket default size- 8 aren't needed.
+    Size1 = utils_max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
+
+    // Calculate the exponent for MinBucketSize used for finding buckets.
+    ai->MinBucketSizeExp = (size_t)log2Utils(Size1);
+    ai->DefaultSharedLimits = shared_limits_create(SIZE_MAX);
+
+    // count number of buckets, start from 1
+    ai->buckets_num = 1;
+    size_t Size2 = Size1 + Size1 / 2;
+    size_t ts2 = Size2, ts1 = Size1;
+    for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2) {
+        ai->buckets_num += 2;
+    }
+    ai->buckets =
+        (bucket_t **)umf_ba_global_alloc(sizeof(bucket_t *) * ai->buckets_num);
+
+    int i = 0;
+    Size1 = ts1;
+    Size2 = ts2;
+    for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2, i += 2) {
+        ai->buckets[i] = create_bucket(Size1, ai, AllocImpl_getLimits(ai));
+        ai->buckets[i + 1] = create_bucket(Size2, ai, AllocImpl_getLimits(ai));
+    }
+    ai->buckets[i] = create_bucket(CutOff, ai, AllocImpl_getLimits(ai));
+
+    umf_result_t ret = umfMemoryProviderGetMinPageSize(
+        hProvider, NULL, &ai->ProviderMinPageSize);
+    if (ret != UMF_RESULT_SUCCESS) {
+        ai->ProviderMinPageSize = 0;
+    }
+
+    return ai;
+}
+
+void destroy_AllocImpl(AllocImpl *ai) {
+    // TODO
+    // destroy DefaultSharedLimits
+
+    for (size_t i = 0; i < ai->buckets_num; i++) {
+        destroy_bucket(ai->buckets[i]);
+    }
+
+    VALGRIND_DO_DESTROY_MEMPOOL(ai);
+
+    critnib_delete(ai->known_slabs);
+
+    utils_mutex_destroy_not_free(&ai->known_slabs_map_lock);
+
+    umf_ba_global_free(ai);
+}
+
+umf_memory_provider_handle_t AllocImpl_getMemHandle(AllocImpl *ai) {
+    return ai->MemHandle;
+}
+
+utils_mutex_t *AllocImpl_getKnownSlabsMapLock(AllocImpl *ai) {
+    return &ai->known_slabs_map_lock;
+}
+
+critnib *AllocImpl_getKnownSlabs(AllocImpl *ai) { return ai->known_slabs; }
+
+size_t AllocImpl_SlabMinSize(AllocImpl *ai) { return ai->params.SlabMinSize; };
+
+umf_disjoint_pool_params_t *AllocImpl_getParams(AllocImpl *ai) {
+    return &ai->params;
 }
 
 #ifdef __cplusplus

@@ -144,4 +144,49 @@ umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket);
 utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket);
 critnib *bucket_get_known_slabs(bucket_t *bucket);
 
+typedef struct AllocImpl {
+    // It's important for the map to be destroyed last after buckets and their
+    // slabs This is because slab's destructor removes the object from the map.
+    critnib *known_slabs; // (void *, slab_t *)
+
+    // prev std::shared_timed_mutex - ok?
+    utils_mutex_t known_slabs_map_lock;
+
+    // Handle to the memory provider
+    umf_memory_provider_handle_t MemHandle;
+
+    // Store as unique_ptrs since Bucket is not Movable(because of std::mutex)
+    bucket_t **buckets;
+    size_t buckets_num;
+
+    // Configuration for this instance
+    umf_disjoint_pool_params_t params;
+
+    umf_disjoint_pool_shared_limits_t *DefaultSharedLimits;
+
+    // Used in algorithm for finding buckets
+    size_t MinBucketSizeExp;
+
+    // Coarse-grain allocation min alignment
+    size_t ProviderMinPageSize;
+
+} AllocImpl;
+
+AllocImpl *create_AllocImpl(umf_memory_provider_handle_t hProvider,
+                            umf_disjoint_pool_params_t *params);
+void destroy_AllocImpl(AllocImpl *ai);
+
+bucket_t *AllocImpl_findBucket(AllocImpl *ai, size_t Size);
+umf_result_t AllocImpl_deallocate(AllocImpl *ai, void *Ptr, bool *ToPool);
+umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(AllocImpl *ai);
+void *AllocImpl_allocate(AllocImpl *ai, size_t Size, bool *FromPool);
+void *AllocImpl_allocate_align(AllocImpl *ai, size_t Size, size_t Alignment,
+                               bool *FromPool);
+
+umf_memory_provider_handle_t AllocImpl_getMemHandle(AllocImpl *ai);
+utils_mutex_t *AllocImpl_getKnownSlabsMapLock(AllocImpl *ai);
+critnib *AllocImpl_getKnownSlabs(AllocImpl *ai);
+size_t AllocImpl_SlabMinSize(AllocImpl *ai);
+umf_disjoint_pool_params_t *AllocImpl_getParams(AllocImpl *ai);
+
 #endif // TEMP_H
