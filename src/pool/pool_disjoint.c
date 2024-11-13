@@ -15,8 +15,10 @@
 #include <umf/memory_provider.h>
 #include <umf/pools/pool_disjoint.h>
 
-#include "base_alloc_global.h"
+#include "critnib/critnib.h"
 #include "uthash/utlist.h"
+
+#include "base_alloc_global.h"
 #include "utils_common.h"
 #include "utils_concurrency.h"
 #include "utils_log.h"
@@ -540,6 +542,46 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
     bucket_update_stats(bucket, -1, 0);
     *to_pool = false;
     return false;
+}
+
+void slab_reg_by_addr(void *addr, slab_t *slab) {
+    bucket_t *bucket = slab_get_bucket(slab);
+    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
+    critnib *slabs = bucket_get_known_slabs(bucket);
+
+    utils_mutex_lock(lock);
+
+    // TODO multimap
+    slab_t *t = (slab_t *)critnib_get(slabs, (uintptr_t)addr);
+    assert(t == NULL);
+    (void)t;
+
+    fprintf(stderr, "[DP slab_reg_by_addr] addr: %p, slab: %p\n", addr,
+            (void *)slab);
+    critnib_insert(slabs, (uintptr_t)addr, slab, 0);
+
+    utils_mutex_unlock(lock);
+}
+
+void slab_unreg_by_addr(void *addr, slab_t *slab) {
+    bucket_t *bucket = slab_get_bucket(slab);
+    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
+    critnib *slabs = bucket_get_known_slabs(bucket);
+
+    utils_mutex_lock(lock);
+
+    // debug only
+    // assume single-value per key
+    slab_t *known_slab = (slab_t *)critnib_get(slabs, (uintptr_t)addr);
+    assert(known_slab != NULL && "Slab is not found");
+    assert(slab == known_slab);
+    (void)known_slab;
+
+    fprintf(stderr, "[DP slab_unreg_by_addr] addr: %p, slab: %p\n", addr,
+            (void *)slab);
+    critnib_remove(slabs, (uintptr_t)addr);
+
+    utils_mutex_unlock(lock);
 }
 
 #ifdef __cplusplus

@@ -141,5 +141,7 @@ void bucket_free_slab(bucket_t *bucket, slab_t *slab, bool *to_pool);
 umf_disjoint_pool_shared_limits_t *bucket_get_limits(bucket_t *bucket);
 umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket);
 umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket);
+utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket);
+critnib *bucket_get_known_slabs(bucket_t *bucket);
 
 #endif // TEMP_H
