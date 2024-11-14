@@ -31,7 +31,6 @@ typedef struct slab_t slab_t;
 typedef struct slab_list_item_t slab_list_item_t;
 typedef struct AllocImpl AllocImpl;
 
-
 slab_t *create_slab(bucket_t *bucket);
 void destroy_slab(slab_t *slab);
 
@@ -98,8 +97,7 @@ critnib *AllocImpl_getKnownSlabs(AllocImpl *ai);
 size_t AllocImpl_SlabMinSize(AllocImpl *ai);
 umf_disjoint_pool_params_t *AllocImpl_getParams(AllocImpl *ai);
 
-//static <- make static rename to TLS_last_allocation_error
-__TLS umf_result_t TLS_last_allocation_error_dp;
+static __TLS umf_result_t TLS_last_allocation_error;
 
 // Allocations are a minimum of 4KB/64KB/2MB even when a smaller size is
 // requested. The implementation distinguishes between allocations of size
@@ -146,7 +144,6 @@ static size_t CutOff = (size_t)1 << 31; // 2GB
 
 void annotate_memory_inaccessible(void *ptr, size_t size);
 void annotate_memory_undefined(void *ptr, size_t size);
-
 
 typedef struct slab_list_item_t slab_list_item_t;
 
@@ -233,7 +230,6 @@ typedef struct slab_list_item_t {
     slab_t *val;
     struct slab_list_item_t *prev, *next;
 } slab_list_item_t;
-
 
 typedef struct umf_disjoint_pool_shared_limits_t {
     size_t max_size;
@@ -991,7 +987,7 @@ static void *memoryProviderAlloc(umf_memory_provider_handle_t hProvider,
     void *ptr;
     umf_result_t ret = umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
     if (ret != UMF_RESULT_SUCCESS) {
-        TLS_last_allocation_error_dp = ret;
+        TLS_last_allocation_error = ret;
         return NULL;
     }
     annotate_memory_inaccessible(ptr, size);
@@ -1013,7 +1009,7 @@ static umf_result_t memoryProviderFree(umf_memory_provider_handle_t hProvider,
     umf_result_t ret = umfMemoryProviderFree(hProvider, ptr, size);
     if (ret != UMF_RESULT_SUCCESS) {
 
-        TLS_last_allocation_error_dp = ret;
+        TLS_last_allocation_error = ret;
         // throw MemoryProviderError{ret};
         return ret;
     }
@@ -1033,7 +1029,7 @@ void *AllocImpl_allocate(AllocImpl *ai, size_t Size, bool *FromPool) {
 
         if (Ptr == NULL) {
             // TODO get code from func
-            TLS_last_allocation_error_dp = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+            TLS_last_allocation_error = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
             return NULL;
         }
 
@@ -1051,7 +1047,7 @@ void *AllocImpl_allocate(AllocImpl *ai, size_t Size, bool *FromPool) {
 
     if (Ptr == NULL) {
         // TODO get code from func
-        TLS_last_allocation_error_dp = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+        TLS_last_allocation_error = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
         return NULL;
     }
 
@@ -1256,7 +1252,7 @@ void *disjoint_pool_calloc(void *pool, size_t num, size_t size) {
     (void)size;
 
     // Not supported
-    TLS_last_allocation_error_dp = UMF_RESULT_ERROR_NOT_SUPPORTED;
+    TLS_last_allocation_error = UMF_RESULT_ERROR_NOT_SUPPORTED;
     return NULL;
 }
 
@@ -1266,7 +1262,7 @@ void *disjoint_pool_realloc(void *pool, void *ptr, size_t size) {
     (void)size;
 
     // Not supported
-    TLS_last_allocation_error_dp = UMF_RESULT_ERROR_NOT_SUPPORTED;
+    TLS_last_allocation_error = UMF_RESULT_ERROR_NOT_SUPPORTED;
     return NULL;
 }
 
@@ -1321,7 +1317,7 @@ umf_result_t disjoint_pool_free(void *pool, void *ptr) {
 umf_result_t disjoint_pool_get_last_allocation_error(void *pool) {
     (void)pool;
 
-    return TLS_last_allocation_error_dp;
+    return TLS_last_allocation_error;
 }
 
 // Define destructor for use with unique_ptr
