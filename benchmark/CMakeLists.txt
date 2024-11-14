@@ -22,6 +22,17 @@ FetchContent_MakeAvailable(googlebenchmark)
 # In MSVC builds, there is no way to determine the actual build type during the
 # CMake configuration step. Therefore, this message is printed in all MSVC
 # builds.
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+
+include(FetchContent)
+FetchContent_Declare(
+    googlebenchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.9.0)
+FetchContent_MakeAvailable(googlebenchmark)
+
 if(WINDOWS OR NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     message(
         STATUS
@@ -68,18 +79,6 @@ function(add_umf_benchmark)
         NAME ${BENCH_NAME}
         COMMAND ${BENCH_NAME}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-
-    if("${BENCH_NAME}" STREQUAL "umf-ubench")
-        # Benchmark passes if it prints "PASSED" in the output, because ubench
-        # of scalable pool fails if the confidence interval exceeds maximum
-        # permitted 2.5%.
-        set_tests_properties(
-            ${BENCH_NAME} PROPERTIES
-            LABELS "benchmark"
-            PASS_REGULAR_EXPRESSION "PASSED")
-    else()
-        set_tests_properties(${BENCH_NAME} PROPERTIES LABELS "benchmark")
-    endif()
 
     if(WINDOWS)
         # append PATH to DLLs
@@ -133,21 +132,8 @@ endif()
 # BENCHMARKS
 
 add_umf_benchmark(
-    NAME ubench
-    SRCS ubench.c ${SRCS_OPTIONAL}
-    LIBS ${LIBS_OPTIONAL}
-    LIBDIRS ${LIB_DIRS})
-
-add_umf_benchmark(
     NAME benchmark
     SRCS benchmark.cpp
     LIBS ${LIBS_OPTIONAL} benchmark::benchmark
     LIBDIRS ${LIB_DIRS})
 
-if(UMF_BUILD_BENCHMARKS_MT)
-    add_umf_benchmark(
-        NAME multithreaded
-        SRCS multithread.cpp
-        LIBS ${LIBS_OPTIONAL} ${CMAKE_THREAD_LIBS_INIT}
-        LIBDIRS ${LIB_DIRS})
-endif()
