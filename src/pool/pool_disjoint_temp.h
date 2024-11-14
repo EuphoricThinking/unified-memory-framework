@@ -6,8 +6,6 @@
 void annotate_memory_inaccessible(void *ptr, size_t size);
 void annotate_memory_undefined(void *ptr, size_t size);
 
-umf_disjoint_pool_shared_limits_t *shared_limits_create(size_t max_size);
-void shared_limits_destroy(umf_disjoint_pool_shared_limits_t *shared_limits);
 
 typedef struct slab_list_item_t slab_list_item_t;
 
