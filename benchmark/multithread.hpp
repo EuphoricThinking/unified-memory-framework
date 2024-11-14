@@ -17,7 +17,6 @@
 #include <functional>
 #include <mutex>
 #include <numeric>
-#include <stdexcept>
 #include <thread>
 #include <vector>
 
