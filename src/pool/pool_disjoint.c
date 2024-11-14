@@ -675,6 +675,7 @@ void destroy_AllocImpl(AllocImpl *ai) {
 
     VALGRIND_DO_DESTROY_MEMPOOL(ai);
 
+    shared_limits_destroy(ai->DefaultSharedLimits);
     critnib_delete(ai->known_slabs);
 
     utils_mutex_destroy_not_free(&ai->known_slabs_map_lock);
