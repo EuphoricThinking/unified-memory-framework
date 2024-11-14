@@ -45,6 +45,8 @@ extern "C" {
 
 #include "pool_disjoint_temp.h"
 
+extern __TLS umf_result_t TLS_last_allocation_error_dp;
+
 #ifdef __cplusplus
 }
 #endif
@@ -110,7 +112,7 @@ static void *memoryProviderAlloc(umf_memory_provider_handle_t hProvider,
     void *ptr;
     auto ret = umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
     if (ret != UMF_RESULT_SUCCESS) {
-        umf::getPoolLastStatusRef<DisjointPool>() = ret;
+        TLS_last_allocation_error_dp = ret;
         return NULL;
     }
     annotate_memory_inaccessible(ptr, size);
@@ -132,7 +134,7 @@ static umf_result_t memoryProviderFree(umf_memory_provider_handle_t hProvider,
     auto ret = umfMemoryProviderFree(hProvider, ptr, size);
     if (ret != UMF_RESULT_SUCCESS) {
 
-        umf::getPoolLastStatusRef<DisjointPool>() = ret;
+        TLS_last_allocation_error_dp = ret;
         // throw MemoryProviderError{ret};
         return ret;
     }
@@ -184,8 +186,7 @@ void *AllocImpl_allocate(AllocImpl *ai, size_t Size, bool *FromPool) {
 
         if (Ptr == NULL) {
             // TODO get code from func
-            umf::getPoolLastStatusRef<DisjointPool>() =
-                UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+            TLS_last_allocation_error_dp = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
             return nullptr;
         }
 
@@ -203,8 +204,7 @@ void *AllocImpl_allocate(AllocImpl *ai, size_t Size, bool *FromPool) {
 
     if (Ptr == NULL) {
         // TODO get code from func
-        umf::getPoolLastStatusRef<DisjointPool>() =
-            UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+        TLS_last_allocation_error_dp = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
         return nullptr;
     }
 
@@ -358,13 +358,13 @@ void *DisjointPool::malloc(size_t size) { // For full-slab allocations indicates
 
 void *DisjointPool::calloc(size_t, size_t) {
     // Not supported
-    umf::getPoolLastStatusRef<DisjointPool>() = UMF_RESULT_ERROR_NOT_SUPPORTED;
+    TLS_last_allocation_error_dp = UMF_RESULT_ERROR_NOT_SUPPORTED;
     return NULL;
 }
 
 void *DisjointPool::realloc(void *, size_t) {
     // Not supported
-    umf::getPoolLastStatusRef<DisjointPool>() = UMF_RESULT_ERROR_NOT_SUPPORTED;
+    TLS_last_allocation_error_dp = UMF_RESULT_ERROR_NOT_SUPPORTED;
     return NULL;
 }
 
@@ -407,7 +407,7 @@ umf_result_t DisjointPool::free(void *ptr) {
 }
 
 umf_result_t DisjointPool::get_last_allocation_error() {
-    return umf::getPoolLastStatusRef<DisjointPool>();
+    return TLS_last_allocation_error_dp;
 }
 
 DisjointPool::DisjointPool() {}

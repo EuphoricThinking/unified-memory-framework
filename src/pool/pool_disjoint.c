@@ -27,9 +27,13 @@
 
 #include "pool_disjoint_temp.h"
 
+// TODO remove
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//static <- make static rename to TLS_last_allocation_error
+__TLS umf_result_t TLS_last_allocation_error_dp;
 
 static size_t CutOff = (size_t)1 << 31; // 2GB
 
@@ -768,6 +772,7 @@ void AllocImpl_printStats(AllocImpl *ai, bool *TitlePrinted,
     }
 }
 
+// TODO remove
 #ifdef __cplusplus
 }
 #endif
