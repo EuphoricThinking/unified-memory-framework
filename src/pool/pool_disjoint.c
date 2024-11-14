@@ -36,11 +36,7 @@ void destroy_slab(slab_t *slab);
 
 void *slab_get(const slab_t *slab);
 void *slab_get_end(const slab_t *slab);
-bucket_t *slab_get_bucket(slab_t *slab);
 void *slab_get_chunk(slab_t *slab);
-size_t slab_get_num_chunks(const slab_t *slab);
-size_t slab_get_chunk_size(const slab_t *slab);
-size_t slab_get_num_allocated(const slab_t *slab);
 
 bool slab_has_avail(const slab_t *slab);
 void slab_free_chunk(slab_t *slab, void *ptr);
@@ -59,13 +55,11 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool);
 void bucket_on_free_chunk(bucket_t *bucket, slab_t *slab, bool *to_pool);
 void bucket_decrement_pool(bucket_t *bucket, bool *from_pool);
 void *bucket_get_chunk(bucket_t *bucket, bool *from_pool);
-size_t bucket_get_size(bucket_t *bucket);
 size_t bucket_chunk_cut_off(bucket_t *bucket);
 size_t bucket_capacity(bucket_t *bucket);
 void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *slab,
                        bool *to_pool);
 void bucket_count_alloc(bucket_t *bucket, bool from_pool);
-void bucket_count_free(bucket_t *bucket);
 
 void *bucket_get_slab(bucket_t *bucket, bool *from_pool);
 size_t bucket_slab_alloc_size(bucket_t *bucket);
@@ -73,28 +67,6 @@ size_t bucket_slab_min_size(bucket_t *bucket);
 slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool);
 slab_list_item_t *bucket_get_avail_full_slab(bucket_t *bucket, bool *from_pool);
 void bucket_free_slab(bucket_t *bucket, slab_t *slab, bool *to_pool);
-
-const umf_disjoint_pool_shared_limits_t *bucket_get_limits(bucket_t *bucket);
-umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket);
-umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket);
-utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket);
-critnib *bucket_get_known_slabs(bucket_t *bucket);
-
-bucket_t *disjoint_pool_findBucket(disjoint_pool_t *pool, size_t Size);
-umf_result_t disjoint_pool_deallocate(disjoint_pool_t *pool, void *Ptr,
-                                      bool *ToPool);
-umf_disjoint_pool_shared_limits_t *
-disjoint_pool_getLimits(disjoint_pool_t *pool);
-void *disjoint_pool_allocate(disjoint_pool_t *pool, size_t Size,
-                             bool *FromPool);
-void *disjoint_pool_allocate_align(disjoint_pool_t *pool, size_t Size,
-                                   size_t Alignment, bool *FromPool);
-
-umf_memory_provider_handle_t disjoint_pool_getMemHandle(disjoint_pool_t *pool);
-utils_mutex_t *disjoint_pool_getKnownSlabsMapLock(disjoint_pool_t *pool);
-critnib *disjoint_pool_getKnownSlabs(disjoint_pool_t *pool);
-size_t disjoint_pool_SlabMinSize(disjoint_pool_t *pool);
-umf_disjoint_pool_params_t *disjoint_pool_getParams(disjoint_pool_t *pool);
 
 static __TLS umf_result_t TLS_last_allocation_error;
 
@@ -147,13 +119,13 @@ void annotate_memory_undefined(void *ptr, size_t size);
 typedef struct slab_list_item_t slab_list_item_t;
 
 typedef struct bucket_t {
-    size_t Size;
+    size_t size;
 
-    // List of slabs which have at least 1 available chunk.
-    slab_list_item_t *AvailableSlabs;
+    // Linked list of slabs which have at least 1 available chunk.
+    slab_list_item_t *available_slabs;
 
-    // List of slabs with 0 available chunk.
-    slab_list_item_t *UnavailableSlabs;
+    // Linked list of slabs with 0 available chunk.
+    slab_list_item_t *unavailable_slabs;
 
     // Protects the bucket and all the corresponding slabs
     utils_mutex_t bucket_lock;
@@ -181,19 +153,16 @@ typedef struct bucket_t {
     // if any of them is entirely free. Instead we keep a counter of entirely
     // empty slabs within the Available list to speed up the process of checking
     // if a slab in this bucket is already pooled.
-    size_t chunkedSlabsInPool;
+    size_t chunked_slabs_in_pool;
 
     // Statistics
-    size_t allocPoolCount;
-    size_t freeCount;
-    size_t currSlabsInUse;
-    size_t currSlabsInPool;
-    size_t maxSlabsInPool;
-
-    // Statistics
-    size_t allocCount;
-    size_t maxSlabsInUse;
-
+    size_t alloc_pool_count;
+    size_t free_count;
+    size_t curr_slabs_in_use;
+    size_t curr_slabs_in_pool;
+    size_t max_slabs_in_pool;
+    size_t alloc_count;
+    size_t max_slabs_in_use;
 } bucket_t;
 
 // Represents the allocated memory block of size 'slab_min_size'
@@ -254,11 +223,11 @@ typedef struct disjoint_pool_t {
     // slabs This is because slab's destructor removes the object from the map.
     critnib *known_slabs; // (void *, slab_t *)
 
-    // prev std::shared_timed_mutex - ok?
+    // TODO: prev std::shared_timed_mutex - ok?
     utils_mutex_t known_slabs_map_lock;
 
     // Handle to the memory provider
-    umf_memory_provider_handle_t MemHandle;
+    umf_memory_provider_handle_t provider;
 
     // Store as unique_ptrs since Bucket is not Movable(because of std::mutex)
     bucket_t **buckets;
@@ -267,24 +236,20 @@ typedef struct disjoint_pool_t {
     // Configuration for this instance
     umf_disjoint_pool_params_t params;
 
-    umf_disjoint_pool_shared_limits_t *DefaultSharedLimits;
+    umf_disjoint_pool_shared_limits_t *default_shared_limits;
 
     // Used in algorithm for finding buckets
-    size_t MinBucketSizeExp;
+    size_t min_bucket_size_exp;
 
     // Coarse-grain allocation min alignment
-    size_t ProviderMinPageSize;
+    size_t provider_min_page_size;
 } disjoint_pool_t;
-
-size_t bucket_get_size(bucket_t *bucket);
-
-void slab_reg(slab_t *slab);
-void slab_unreg(slab_t *slab);
 
 slab_t *create_slab(bucket_t *bucket) {
     // In case bucket size is not a multiple of SlabMinSize, we would have
     // some padding at the end of the slab.
     slab_t *slab = umf_ba_global_alloc(sizeof(slab_t));
+
     // TODO check res and errors here and everywhere
     // TODO use logger
     slab->num_allocated = 0;
@@ -296,7 +261,7 @@ slab_t *create_slab(bucket_t *bucket) {
     slab->iter->val = slab;
     slab->iter->prev = slab->iter->next = NULL;
 
-    slab->num_chunks = bucket_slab_min_size(bucket) / bucket_get_size(bucket);
+    slab->num_chunks = bucket_slab_min_size(bucket) / bucket->size;
     slab->chunks = umf_ba_global_alloc(sizeof(bool) * slab->num_chunks);
     memset(slab->chunks, 0, sizeof(bool) * slab->num_chunks);
 
@@ -304,8 +269,9 @@ slab_t *create_slab(bucket_t *bucket) {
 
     // NOTE: originally slabs memory were allocated without alignment
     // with this registering a slab is simpler and doesn't require multimap
+    umf_memory_provider_handle_t provider = bucket->pool->provider;
     umf_result_t res =
-        umfMemoryProviderAlloc(bucket_get_mem_handle(bucket), slab->slab_size,
+        umfMemoryProviderAlloc(provider, slab->slab_size,
                                bucket_slab_min_size(bucket), &slab->mem_ptr);
 
     if (res == UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY) {
@@ -324,8 +290,9 @@ void destroy_slab(slab_t *slab) {
     fprintf(stderr, "[DP destroy_slab] bucket: %p, slab_size: %zu\n",
             (void *)slab->bucket, slab->slab_size);
 
-    umf_result_t res = umfMemoryProviderFree(
-        bucket_get_mem_handle(slab->bucket), slab->mem_ptr, slab->slab_size);
+    umf_memory_provider_handle_t provider = slab->bucket->pool->provider;
+    umf_result_t res =
+        umfMemoryProviderFree(provider, slab->mem_ptr, slab->slab_size);
     assert(res == UMF_RESULT_SUCCESS);
     (void)res;
 
@@ -333,12 +300,6 @@ void destroy_slab(slab_t *slab) {
     umf_ba_global_free(slab->iter);
     umf_ba_global_free(slab);
 }
-
-size_t slab_get_num_allocated(const slab_t *slab) {
-    return slab->num_allocated;
-}
-
-size_t slab_get_num_chunks(const slab_t *slab) { return slab->num_chunks; }
 
 // Return the index of the first available chunk, SIZE_MAX otherwise
 size_t slab_find_first_available_chunk_idx(const slab_t *slab) {
@@ -367,7 +328,7 @@ void *slab_get_chunk(slab_t *slab) {
     assert(chunk_idx != SIZE_MAX);
 
     void *free_chunk =
-        (uint8_t *)slab->mem_ptr + chunk_idx * slab_get_chunk_size(slab);
+        (uint8_t *)slab->mem_ptr + chunk_idx * slab->bucket->size;
     // mark as used
     slab->chunks[chunk_idx] = true;
     slab->num_allocated += 1;
@@ -381,15 +342,10 @@ void *slab_get_chunk(slab_t *slab) {
     return free_chunk;
 }
 
-void *slab_get_end(const slab_t *slab) {
-    return (uint8_t *)slab->mem_ptr + bucket_slab_min_size(slab->bucket);
-}
-
 // TODO remove? why need getter/setter?
 void *slab_get(const slab_t *slab) { return slab->mem_ptr; }
-bucket_t *slab_get_bucket(slab_t *slab) { return slab->bucket; }
-size_t slab_get_chunk_size(const slab_t *slab) {
-    return bucket_get_size(slab->bucket);
+void *slab_get_end(const slab_t *slab) {
+    return (uint8_t *)slab->mem_ptr + bucket_slab_min_size(slab->bucket);
 }
 
 void slab_free_chunk(slab_t *slab, void *ptr) {
@@ -402,7 +358,7 @@ void slab_free_chunk(slab_t *slab, void *ptr) {
     // Even if the pointer p was previously aligned, it's still inside the
     // corresponding chunk, so we get the correct index here.
     size_t chunk_idx =
-        ((uint8_t *)ptr - (uint8_t *)slab->mem_ptr) / slab_get_chunk_size(slab);
+        ((uint8_t *)ptr - (uint8_t *)slab->mem_ptr) / slab->bucket->size;
 
     // Make sure that the chunk was allocated
     assert(slab->chunks[chunk_idx] && "double free detected");
@@ -424,7 +380,7 @@ bool slab_has_avail(const slab_t *slab) {
 }
 
 void slab_reg(slab_t *slab) {
-    bucket_t *bucket = slab_get_bucket(slab);
+    bucket_t *bucket = slab->bucket;
     // NOTE: changed vs original - slab is already aligned to bucket_slab_min_size
     // I also decr end_addr by 1
     void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
@@ -439,7 +395,7 @@ void slab_reg(slab_t *slab) {
 }
 
 void slab_unreg(slab_t *slab) {
-    bucket_t *bucket = slab_get_bucket(slab);
+    bucket_t *bucket = slab->bucket;
     // NOTE: changed vs original - slab is already aligned to bucket_slab_min_size
     // I also decr end_addr by 1
     void *start_addr = (void *)ALIGN_DOWN((size_t)slab_get(slab),
@@ -455,23 +411,22 @@ void slab_unreg(slab_t *slab) {
 
 bucket_t *create_bucket(size_t Sz, disjoint_pool_t *pool,
                         umf_disjoint_pool_shared_limits_t *shared_limits) {
+
     bucket_t *bucket = (bucket_t *)umf_ba_global_alloc(sizeof(bucket_t));
 
-    bucket->Size = Sz;
+    bucket->size = Sz;
     bucket->pool = pool;
-    bucket->AvailableSlabs = NULL;
-    bucket->UnavailableSlabs = NULL;
-    bucket->chunkedSlabsInPool = 0;
-    bucket->allocPoolCount = 0;
-    bucket->freeCount = 0;
-    bucket->currSlabsInUse = 0;
-    bucket->currSlabsInPool = 0;
-    bucket->maxSlabsInPool = 0;
-    bucket->allocCount = 0;
-    bucket->maxSlabsInUse = 0;
-
+    bucket->available_slabs = NULL;
+    bucket->unavailable_slabs = NULL;
+    bucket->chunked_slabs_in_pool = 0;
+    bucket->alloc_pool_count = 0;
+    bucket->free_count = 0;
+    bucket->curr_slabs_in_use = 0;
+    bucket->curr_slabs_in_pool = 0;
+    bucket->max_slabs_in_pool = 0;
+    bucket->alloc_count = 0;
+    bucket->max_slabs_in_use = 0;
     bucket->shared_limits = shared_limits;
-    assert(shared_limits);
 
     utils_mutex_init(&bucket->bucket_lock);
 
@@ -479,78 +434,69 @@ bucket_t *create_bucket(size_t Sz, disjoint_pool_t *pool,
 }
 
 void destroy_bucket(bucket_t *bucket) {
+    // use an extra tmp to store the next iterator before destroying the slab
     slab_list_item_t *it = NULL, *tmp = NULL;
-    // TODO check eng
-    // use extra tmp to store next iterator before the slab is destroyed
-    LL_FOREACH_SAFE(bucket->AvailableSlabs, it, tmp) { destroy_slab(it->val); }
-    LL_FOREACH_SAFE(bucket->UnavailableSlabs, it, tmp) {
+    LL_FOREACH_SAFE(bucket->available_slabs, it, tmp) { destroy_slab(it->val); }
+    LL_FOREACH_SAFE(bucket->unavailable_slabs, it, tmp) {
         destroy_slab(it->val);
     }
 
     utils_mutex_destroy_not_free(&bucket->bucket_lock);
-
     umf_ba_global_free(bucket);
 }
 
 // The lock must be acquired before calling this method
-void bucket_on_free_chunk(bucket_t *bucket, slab_t *slab, bool *ToPool) {
-    *ToPool = true;
+void bucket_on_free_chunk(bucket_t *bucket, slab_t *slab, bool *to_pool) {
+    *to_pool = true;
 
     // In case if the slab was previously full and now has 1 available
     // chunk, it should be moved to the list of available slabs
-    if (slab_get_num_allocated(slab) == (slab_get_num_chunks(slab) - 1)) {
+    if (slab->num_allocated == (slab->num_chunks - 1)) {
         slab_list_item_t *slab_it = slab->iter;
         assert(slab_it->val != NULL);
-        DL_DELETE(bucket->UnavailableSlabs, slab_it);
-        DL_PREPEND(bucket->AvailableSlabs, slab_it);
+        DL_DELETE(bucket->unavailable_slabs, slab_it);
+        DL_PREPEND(bucket->available_slabs, slab_it);
     }
 
     // Check if slab is empty, and pool it if we can.
-    if (slab_get_num_allocated(slab) == 0) {
+    if (slab->num_allocated == 0) {
         // The slab is now empty.
         // If pool has capacity then put the slab in the pool.
         // The ToPool parameter indicates whether the Slab will be put in the
         // pool or freed.
-        if (!bucket_can_pool(bucket, ToPool)) {
+        if (!bucket_can_pool(bucket, to_pool)) {
             // Note: since the slab is stored as unique_ptr, just remove it from
             // the list to destroy the object.
             slab_list_item_t *slab_it = slab->iter;
             assert(slab_it->val != NULL);
             slab_unreg(slab_it->val);
-            DL_DELETE(bucket->AvailableSlabs, slab_it);
+            DL_DELETE(bucket->available_slabs, slab_it);
             destroy_slab(slab_it->val);
         }
     }
 }
 
-// Return the allocation size of this bucket.
-size_t bucket_get_size(bucket_t *bucket) { return bucket->Size; }
-
-disjoint_pool_t *bucket_get_alloc_ctx(bucket_t *bucket) { return bucket->pool; }
-
-void bucket_count_free(bucket_t *bucket) { ++bucket->freeCount; }
-
-void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *Slab,
-                       bool *ToPool) {
+void bucket_free_chunk(bucket_t *bucket, void *ptr, slab_t *slab,
+                       bool *to_pool) {
     utils_mutex_lock(&bucket->bucket_lock);
 
-    slab_free_chunk(Slab, ptr);
-    bucket_on_free_chunk(bucket, Slab, ToPool);
+    slab_free_chunk(slab, ptr);
+    bucket_on_free_chunk(bucket, slab, to_pool);
 
     utils_mutex_unlock(&bucket->bucket_lock);
 }
 
-void bucket_count_alloc(bucket_t *bucket, bool FromPool) {
-    ++bucket->allocCount;
-    if (FromPool) {
-        ++bucket->allocPoolCount;
+void bucket_count_alloc(bucket_t *bucket, bool from_pool) {
+    ++bucket->alloc_count;
+    if (from_pool) {
+        ++bucket->alloc_pool_count;
     }
 }
 
-void *bucket_get_chunk(bucket_t *bucket, bool *FromPool) {
+void *bucket_get_chunk(bucket_t *bucket, bool *from_pool) {
     utils_mutex_lock(&bucket->bucket_lock);
 
-    slab_list_item_t *slab_it = bucket_get_avail_slab(bucket, FromPool);
+    slab_list_item_t *slab_it = bucket_get_avail_slab(bucket, from_pool);
     if (slab_it == NULL) {
         utils_mutex_unlock(&bucket->bucket_lock);
         return NULL;
@@ -560,8 +506,8 @@ void *bucket_get_chunk(bucket_t *bucket, bool *FromPool) {
 
     // If the slab is full, move it to unavailable slabs and update its iterator
     if (!(slab_has_avail(slab_it->val))) {
-        DL_DELETE(bucket->AvailableSlabs, slab_it);
-        DL_PREPEND(bucket->UnavailableSlabs, slab_it);
+        DL_DELETE(bucket->available_slabs, slab_it);
+        DL_PREPEND(bucket->unavailable_slabs, slab_it);
     }
 
     utils_mutex_unlock(&bucket->bucket_lock);
@@ -573,20 +519,17 @@ size_t bucket_chunk_cut_off(bucket_t *bucket) {
 }
 
 size_t bucket_slab_alloc_size(bucket_t *bucket) {
-    // return max
-    return (bucket_get_size(bucket) > bucket_slab_min_size(bucket))
-               ? bucket_get_size(bucket)
-               : bucket_slab_min_size(bucket);
+    return utils_max(bucket->size, bucket_slab_min_size(bucket));
 }
 
 size_t bucket_slab_min_size(bucket_t *bucket) {
-    return bucket_get_params(bucket)->SlabMinSize;
+    return bucket->pool->params.SlabMinSize;
 }
 
 slab_list_item_t *bucket_get_avail_full_slab(bucket_t *bucket,
                                              bool *from_pool) {
     // Return a slab that will be used for a single allocation.
-    if (bucket->AvailableSlabs == NULL) {
+    if (bucket->available_slabs == NULL) {
         slab_t *slab = create_slab(bucket);
         if (slab == NULL) {
             //assert(0);
@@ -594,14 +537,14 @@ slab_list_item_t *bucket_get_avail_full_slab(bucket_t *bucket,
         }
 
         slab_reg(slab);
-        DL_PREPEND(bucket->AvailableSlabs, slab->iter);
+        DL_PREPEND(bucket->available_slabs, slab->iter);
         *from_pool = false;
         bucket_update_stats(bucket, 1, 0);
     } else {
         bucket_decrement_pool(bucket, from_pool);
     }
 
-    return bucket->AvailableSlabs;
+    return bucket->available_slabs;
 }
 
 void *bucket_get_slab(bucket_t *bucket, bool *from_pool) {
@@ -615,8 +558,9 @@ void *bucket_get_slab(bucket_t *bucket, bool *from_pool) {
     slab_t *slab = slab_it->val;
     void *ptr = slab_get(slab);
 
-    DL_DELETE(bucket->AvailableSlabs, slab_it);
-    DL_PREPEND(bucket->UnavailableSlabs, slab_it);
+    DL_DELETE(bucket->available_slabs, slab_it);
+    slab_it->prev = NULL;
+    DL_PREPEND(bucket->unavailable_slabs, slab_it);
 
     utils_mutex_unlock(&bucket->bucket_lock);
     return ptr;
@@ -628,18 +572,19 @@ void bucket_free_slab(bucket_t *bucket, slab_t *slab, bool *to_pool) {
     slab_list_item_t *slab_it = slab->iter;
     assert(slab_it->val != NULL);
     if (bucket_can_pool(bucket, to_pool)) {
-        DL_DELETE(bucket->UnavailableSlabs, slab_it);
-        DL_PREPEND(bucket->AvailableSlabs, slab_it);
+        DL_DELETE(bucket->unavailable_slabs, slab_it);
+        slab_it->prev = NULL;
+        DL_PREPEND(bucket->available_slabs, slab_it);
     } else {
         slab_unreg(slab_it->val);
-        DL_DELETE(bucket->UnavailableSlabs, slab_it);
+        DL_DELETE(bucket->unavailable_slabs, slab_it);
         destroy_slab(slab_it->val);
     }
     utils_mutex_unlock(&bucket->bucket_lock);
 }
 
 slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool) {
-    if (bucket->AvailableSlabs == NULL) {
+    if (bucket->available_slabs == NULL) {
         slab_t *slab = create_slab(bucket);
         if (slab == NULL) {
             // TODO log
@@ -648,14 +593,15 @@ slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool) {
         }
 
         slab_reg(slab);
-        DL_PREPEND(bucket->AvailableSlabs, slab->iter);
+        DL_PREPEND(bucket->available_slabs, slab->iter);
         bucket_update_stats(bucket, 1, 0);
         *from_pool = false;
     } else {
-        if (slab_get_num_allocated(bucket->AvailableSlabs->val) == 0) {
+        slab_t *slab = bucket->available_slabs->val;
+        if (slab->num_allocated == 0) {
             // If this was an empty slab, it was in the pool.
             // Now it is no longer in the pool, so update count.
-            --bucket->chunkedSlabsInPool;
+            --bucket->chunked_slabs_in_pool;
             bucket_decrement_pool(bucket, from_pool);
         } else {
             // Allocation from existing slab is treated as from pool for statistics.
@@ -663,38 +609,34 @@ slab_list_item_t *bucket_get_avail_slab(bucket_t *bucket, bool *from_pool) {
         }
     }
 
-    return bucket->AvailableSlabs;
+    return bucket->available_slabs;
 }
 
 size_t bucket_capacity(bucket_t *bucket) {
     // For buckets used in chunked mode, just one slab in pool is sufficient.
     // For larger buckets, the capacity could be more and is adjustable.
-    if (bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket)) {
+    if (bucket->size <= bucket_chunk_cut_off(bucket)) {
         return 1;
     } else {
-        return bucket_get_params(bucket)->Capacity;
+        return bucket->pool->params.Capacity;
     }
-}
-
-size_t bucket_max_poolable_size(bucket_t *bucket) {
-    return bucket_get_params(bucket)->MaxPoolableSize;
 }
 
 void bucket_update_stats(bucket_t *bucket, int in_use, int in_pool) {
-    if (bucket_get_params(bucket)->PoolTrace == 0) {
+    if (bucket->pool->params.PoolTrace == 0) {
         return;
     }
 
-    bucket->currSlabsInUse += in_use;
-    bucket->maxSlabsInUse =
-        utils_max(bucket->currSlabsInUse, bucket->maxSlabsInUse);
-    bucket->currSlabsInPool += in_pool;
-    bucket->maxSlabsInPool =
-        utils_max(bucket->currSlabsInPool, bucket->maxSlabsInPool);
+    bucket->curr_slabs_in_use += in_use;
+    bucket->max_slabs_in_use =
+        utils_max(bucket->curr_slabs_in_use, bucket->max_slabs_in_use);
+    bucket->curr_slabs_in_pool += in_pool;
+    bucket->max_slabs_in_pool =
+        utils_max(bucket->curr_slabs_in_pool, bucket->max_slabs_in_pool);
 
     // Increment or decrement current pool sizes based on whether
     // slab was added to or removed from pool.
-    bucket_get_params(bucket)->CurPoolSize +=
+    bucket->pool->params.CurPoolSize +=
         in_pool * bucket_slab_alloc_size(bucket);
 }
 
@@ -708,22 +650,21 @@ void bucket_decrement_pool(bucket_t *bucket, bool *from_pool) {
 }
 
 bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
-    size_t NewFreeSlabsInBucket;
+    size_t new_free_slabs_in_bucket;
 
     // Check if this bucket is used in chunked form or as full slabs.
-    bool chunkedBucket =
-        bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket);
+    bool chunkedBucket = bucket->size <= bucket_chunk_cut_off(bucket);
     if (chunkedBucket) {
-        NewFreeSlabsInBucket = bucket->chunkedSlabsInPool + 1;
+        new_free_slabs_in_bucket = bucket->chunked_slabs_in_pool + 1;
     } else {
         // TODO optimize
         size_t avail_num = 0;
         slab_list_item_t *it = NULL;
-        DL_FOREACH(bucket->AvailableSlabs, it) { avail_num++; }
-        NewFreeSlabsInBucket = avail_num + 1;
+        DL_FOREACH(bucket->available_slabs, it) { avail_num++; }
+        new_free_slabs_in_bucket = avail_num + 1;
     }
 
-    if (bucket_capacity(bucket) >= NewFreeSlabsInBucket) {
+    if (bucket_capacity(bucket) >= new_free_slabs_in_bucket) {
         size_t pool_size = 0;
         utils_atomic_load_acquire(&bucket->shared_limits->total_size,
                                   &pool_size);
@@ -743,7 +684,7 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
                                        &pool_size, &new_pool_size)) {
 #endif
                 if (chunkedBucket) {
-                    ++bucket->chunkedSlabsInPool;
+                    ++bucket->chunked_slabs_in_pool;
                 }
 
                 bucket_update_stats(bucket, -1, 1);
@@ -758,26 +699,15 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
     return false;
 }
 
-umf_disjoint_pool_params_t *bucket_get_params(bucket_t *bucket) {
-    return &bucket->pool->params;
-}
-
-umf_memory_provider_handle_t bucket_get_mem_handle(bucket_t *bucket) {
-    return bucket->pool->MemHandle;
-}
-
-critnib *bucket_get_known_slabs(bucket_t *bucket) {
-    return bucket->pool->known_slabs;
-}
-
 utils_mutex_t *bucket_get_known_slabs_map_lock(bucket_t *bucket) {
     return &bucket->pool->known_slabs_map_lock;
 }
 
 void slab_reg_by_addr(void *addr, slab_t *slab) {
-    bucket_t *bucket = slab_get_bucket(slab);
-    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
-    critnib *slabs = bucket_get_known_slabs(bucket);
+    bucket_t *bucket = slab->bucket;
+    disjoint_pool_t *pool = bucket->pool;
+    utils_mutex_t *lock = &pool->known_slabs_map_lock;
+    critnib *slabs = pool->known_slabs;
 
     utils_mutex_lock(lock);
 
@@ -790,18 +720,14 @@ void slab_reg_by_addr(void *addr, slab_t *slab) {
             (void *)slab);
     critnib_insert(slabs, (uintptr_t)addr, slab, 0);
 
-    // debug
-    slab_t *s = (slab_t *)critnib_get(slabs, (uintptr_t)addr);
-    assert(s != NULL);
-    (void)s;
-
     utils_mutex_unlock(lock);
 }
 
 void slab_unreg_by_addr(void *addr, slab_t *slab) {
-    bucket_t *bucket = slab_get_bucket(slab);
-    utils_mutex_t *lock = bucket_get_known_slabs_map_lock(bucket);
-    critnib *slabs = bucket_get_known_slabs(bucket);
+    bucket_t *bucket = slab->bucket;
+    disjoint_pool_t *pool = bucket->pool;
+    utils_mutex_t *lock = &pool->known_slabs_map_lock;
+    critnib *slabs = pool->known_slabs;
 
     utils_mutex_lock(lock);
 
@@ -823,19 +749,21 @@ size_t AllocImpl_sizeToIdx(disjoint_pool_t *pool, size_t size) {
     assert(size <= CutOff && "Unexpected size");
     assert(size > 0 && "Unexpected size");
 
-    size_t MinBucketSize = (size_t)1 << pool->MinBucketSizeExp;
-    if (size < MinBucketSize) {
+    size_t min_bucket_size = (size_t)1 << pool->min_bucket_size_exp;
+    if (size < min_bucket_size) {
         return 0;
     }
 
     // Get the position of the leftmost set bit.
     size_t position = getLeftmostSetBitPos(size);
 
-    bool isPowerOf2 = 0 == (size & (size - 1));
-    bool largerThanHalfwayBetweenPowersOf2 =
-        !isPowerOf2 && (bool)((size - 1) & ((uint64_t)(1) << (position - 1)));
-    size_t index = (position - pool->MinBucketSizeExp) * 2 +
-                   (int)(!isPowerOf2) + (int)largerThanHalfwayBetweenPowersOf2;
+    bool is_power_of_2 = 0 == (size & (size - 1));
+    bool larger_than_halfway_between_powers_of_2 =
+        !is_power_of_2 &&
+        (bool)((size - 1) & ((uint64_t)(1) << (position - 1)));
+    size_t index = (position - pool->min_bucket_size_exp) * 2 +
+                   (int)(!is_power_of_2) +
+                   (int)larger_than_halfway_between_powers_of_2;
 
     return index;
 }
@@ -844,19 +772,19 @@ umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(disjoint_pool_t *pool) {
     if (pool->params.SharedLimits) {
         return pool->params.SharedLimits;
     } else {
-        return pool->DefaultSharedLimits;
+        return pool->default_shared_limits;
     }
 }
 
 bucket_t *AllocImpl_findBucket(disjoint_pool_t *pool, size_t Size) {
     size_t calculatedIdx = AllocImpl_sizeToIdx(pool, Size);
     bucket_t *bucket = pool->buckets[calculatedIdx];
-    assert(bucket_get_size(bucket) >= Size);
+    assert(bucket->size >= Size);
     (void)bucket;
 
     if (calculatedIdx > 0) {
         bucket_t *bucket_prev = pool->buckets[calculatedIdx - 1];
-        assert(bucket_get_size(bucket_prev) < Size);
+        assert(bucket_prev->size < Size);
         (void)bucket_prev;
     }
 
@@ -876,8 +804,8 @@ void AllocImpl_printStats(disjoint_pool_t *pool, bool *TitlePrinted,
         //(*B).printStats(TitlePrinted, MTName);
         bucket_t *bucket = pool->buckets[i];
         *HighPeakSlabsInUse =
-            utils_max(bucket->maxSlabsInUse, *HighPeakSlabsInUse);
-        if (bucket->allocCount) {
+            utils_max(bucket->max_slabs_in_use, *HighPeakSlabsInUse);
+        if (bucket->alloc_count) {
             *HighBucketSize =
                 utils_max(bucket_slab_alloc_size(bucket), *HighBucketSize);
         }
@@ -927,7 +855,7 @@ void *AllocImpl_allocate(disjoint_pool_t *pool, size_t Size, bool *FromPool) {
 
     *FromPool = false;
     if (Size > pool->params.MaxPoolableSize) {
-        Ptr = memoryProviderAlloc(pool->MemHandle, Size, 0);
+        Ptr = memoryProviderAlloc(pool->provider, Size, 0);
 
         if (Ptr == NULL) {
             // TODO get code from func
@@ -958,7 +886,7 @@ void *AllocImpl_allocate(disjoint_pool_t *pool, size_t Size, bool *FromPool) {
     }
 
     VALGRIND_DO_MEMPOOL_ALLOC(pool, Ptr, Size);
-    annotate_memory_undefined(Ptr, bucket_get_size(bucket));
+    annotate_memory_undefined(Ptr, bucket->size);
 
     return Ptr;
 }
@@ -976,13 +904,13 @@ void *AllocImpl_allocate_align(disjoint_pool_t *pool, size_t Size,
     }
 
     size_t AlignedSize;
-    if (Alignment <= pool->ProviderMinPageSize) {
+    if (Alignment <= pool->provider_min_page_size) {
         // This allocation will be served from a Bucket which size is multiple
-        // of Alignment and Slab address is aligned to ProviderMinPageSize
+        // of Alignment and Slab address is aligned to provider_min_page_size
         // so the address will be properly aligned.
         AlignedSize = (Size > 1) ? ALIGN_UP(Size, Alignment) : Alignment;
     } else {
-        // Slabs are only aligned to ProviderMinPageSize, we need to compensate
+        // Slabs are only aligned to provider_min_page_size, we need to compensate
         // for that in case the allocation is within pooling limit.
         // TODO: consider creating properly-aligned Slabs on demand
         AlignedSize = Size + Alignment - 1;
@@ -992,7 +920,7 @@ void *AllocImpl_allocate_align(disjoint_pool_t *pool, size_t Size,
     // If not, just request aligned pointer from the system.
     *FromPool = false;
     if (AlignedSize > pool->params.MaxPoolableSize) {
-        Ptr = memoryProviderAlloc(pool->MemHandle, Size, Alignment);
+        Ptr = memoryProviderAlloc(pool->provider, Size, Alignment);
         assert(Ptr);
         annotate_memory_undefined(Ptr, Size);
         return Ptr;
@@ -1017,7 +945,7 @@ void *AllocImpl_allocate_align(disjoint_pool_t *pool, size_t Size,
 }
 
 umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
-                                  bool *ToPool) {
+                                  bool *to_pool) {
     if (Ptr == NULL) {
         return UMF_RESULT_SUCCESS;
     }
@@ -1027,13 +955,13 @@ umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
     // Lock the map on read
     utils_mutex_lock(&pool->known_slabs_map_lock);
 
-    *ToPool = false;
+    *to_pool = false;
 
     slab_t *slab = (slab_t *)critnib_get(pool->known_slabs, (uintptr_t)SlabPtr);
     //auto Slabs = getKnownSlabs().equal_range(SlabPtr);
     if (slab == NULL) {
         utils_mutex_unlock(&pool->known_slabs_map_lock);
-        umf_result_t ret = memoryProviderFree(pool->MemHandle, Ptr);
+        umf_result_t ret = memoryProviderFree(pool->provider, Ptr);
         return ret;
     }
 
@@ -1046,18 +974,18 @@ umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
         // Unlock the map before freeing the chunk, it may be locked on write
         // there
         utils_mutex_unlock(&pool->known_slabs_map_lock);
-        bucket_t *bucket = slab_get_bucket(slab);
+        bucket_t *bucket = slab->bucket;
 
         if (pool->params.PoolTrace > 1) {
-            bucket_count_free(bucket);
+            bucket->free_count++;
         }
 
         VALGRIND_DO_MEMPOOL_FREE(pool, Ptr);
-        annotate_memory_inaccessible(Ptr, bucket_get_size(bucket));
-        if (bucket_get_size(bucket) <= bucket_chunk_cut_off(bucket)) {
-            bucket_free_chunk(bucket, Ptr, slab, ToPool);
+        annotate_memory_inaccessible(Ptr, bucket->size);
+        if (bucket->size <= bucket_chunk_cut_off(bucket)) {
+            bucket_free_chunk(bucket, Ptr, slab, to_pool);
         } else {
-            bucket_free_slab(bucket, slab, ToPool);
+            bucket_free_slab(bucket, slab, to_pool);
         }
 
         return UMF_RESULT_SUCCESS;
@@ -1068,7 +996,7 @@ umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
     // There is a rare case when we have a pointer from system allocation next
     // to some slab with an entry in the map. So we find a slab
     // but the range checks fail.
-    memoryProviderFree(pool->MemHandle, Ptr);
+    memoryProviderFree(pool->provider, Ptr);
     return UMF_RESULT_SUCCESS;
 }
 
@@ -1076,7 +1004,7 @@ umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
 // TODO?
 std::ostream &operator<<(std::ostream &Os, slab_t &Slab) {
     Os << "Slab<" << slab_get(&Slab) << ", " << slab_get_end(&Slab) << ", "
-       << slab_get_bucket(&Slab)->getSize() << ">";
+       << slab->bucket->getSize() << ">";
     return Os;
 }
 */
@@ -1084,7 +1012,7 @@ std::ostream &operator<<(std::ostream &Os, slab_t &Slab) {
 /*
 // TODO move
 void Bucket::printStats(bool &TitlePrinted, const std::string &Label) {
-    if (allocCount) {
+    if (alloc_count) {
         if (!TitlePrinted) {
             std::cout << Label << " memory statistics\n";
             std::cout << std::setw(14) << "Bucket Size" << std::setw(12)
@@ -1094,10 +1022,10 @@ void Bucket::printStats(bool &TitlePrinted, const std::string &Label) {
                       << "Peak Slabs in Pool" << std::endl;
             TitlePrinted = true;
         }
-        std::cout << std::setw(14) << getSize() << std::setw(12) << allocCount
-                  << std::setw(12) << freeCount << std::setw(18)
-                  << allocPoolCount << std::setw(20) << maxSlabsInUse
-                  << std::setw(21) << maxSlabsInPool << std::endl;
+        std::cout << std::setw(14) << getSize() << std::setw(12) << alloc_count
+                  << std::setw(12) << free_count << std::setw(18)
+                  << allocPoolCount << std::setw(20) << max_slabs_in_use
+                  << std::setw(21) << max_slabs_in_pool << std::endl;
     }
 }
 */
@@ -1126,7 +1054,7 @@ umf_result_t disjoint_pool_initialize(umf_memory_provider_handle_t provider,
 
     VALGRIND_DO_CREATE_MEMPOOL(disjoint_pool, 0, 0);
 
-    disjoint_pool->MemHandle = provider;
+    disjoint_pool->provider = provider;
     disjoint_pool->params = *dp_params;
 
     utils_mutex_init(&disjoint_pool->known_slabs_map_lock);
@@ -1143,8 +1071,8 @@ umf_result_t disjoint_pool_initialize(umf_memory_provider_handle_t provider,
     Size1 = utils_max(Size1, UMF_DISJOINT_POOL_MIN_BUCKET_DEFAULT_SIZE);
 
     // Calculate the exponent for MinBucketSize used for finding buckets.
-    disjoint_pool->MinBucketSizeExp = (size_t)log2Utils(Size1);
-    disjoint_pool->DefaultSharedLimits =
+    disjoint_pool->min_bucket_size_exp = (size_t)log2Utils(Size1);
+    disjoint_pool->default_shared_limits =
         umfDisjointPoolSharedLimitsCreate(SIZE_MAX);
 
     // count number of buckets, start from 1
@@ -1170,9 +1098,9 @@ umf_result_t disjoint_pool_initialize(umf_memory_provider_handle_t provider,
         CutOff, disjoint_pool, AllocImpl_getLimits(disjoint_pool));
 
     umf_result_t ret = umfMemoryProviderGetMinPageSize(
-        provider, NULL, &disjoint_pool->ProviderMinPageSize);
+        provider, NULL, &disjoint_pool->provider_min_page_size);
     if (ret != UMF_RESULT_SUCCESS) {
-        disjoint_pool->ProviderMinPageSize = 0;
+        disjoint_pool->provider_min_page_size = 0;
     }
 
     *ppPool = (void *)disjoint_pool;
@@ -1283,7 +1211,7 @@ void disjoint_pool_finalize(void *pool) {
 
     VALGRIND_DO_DESTROY_MEMPOOL(hPool);
 
-    umfDisjointPoolSharedLimitsDestroy(hPool->DefaultSharedLimits);
+    umfDisjointPoolSharedLimitsDestroy(hPool->default_shared_limits);
     critnib_delete(hPool->known_slabs);
 
     utils_mutex_destroy_not_free(&hPool->known_slabs_map_lock);
