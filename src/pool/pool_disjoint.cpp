@@ -271,50 +271,6 @@ void *AllocImpl_allocate_align(AllocImpl *ai, size_t Size, size_t Alignment,
     return (void *)ALIGN_UP((size_t)Ptr, Alignment);
 }
 
-size_t AllocImpl_sizeToIdx(AllocImpl *ai, size_t Size) {
-    assert(Size <= CutOff && "Unexpected size");
-    assert(Size > 0 && "Unexpected size");
-
-    size_t MinBucketSize = (size_t)1 << ai->MinBucketSizeExp;
-    if (Size < MinBucketSize) {
-        return 0;
-    }
-
-    // Get the position of the leftmost set bit.
-    size_t position = getLeftmostSetBitPos(Size);
-
-    auto isPowerOf2 = 0 == (Size & (Size - 1));
-    auto largerThanHalfwayBetweenPowersOf2 =
-        !isPowerOf2 && bool((Size - 1) & (uint64_t(1) << (position - 1)));
-    auto index = (position - ai->MinBucketSizeExp) * 2 + (int)(!isPowerOf2) +
-                 (int)largerThanHalfwayBetweenPowersOf2;
-
-    return index;
-}
-
-umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(AllocImpl *ai) {
-    if (ai->params.SharedLimits) {
-        return ai->params.SharedLimits;
-    } else {
-        return ai->DefaultSharedLimits;
-    }
-};
-
-bucket_t *AllocImpl_findBucket(AllocImpl *ai, size_t Size) {
-    auto calculatedIdx = AllocImpl_sizeToIdx(ai, Size);
-    bucket_t *bucket = ai->buckets[calculatedIdx];
-    assert(bucket_get_size(bucket) >= Size);
-    (void)bucket;
-
-    if (calculatedIdx > 0) {
-        bucket_t *bucket_prev = ai->buckets[calculatedIdx - 1];
-        assert(bucket_get_size(bucket_prev) < Size);
-        (void)bucket_prev;
-    }
-
-    return ai->buckets[calculatedIdx];
-}
-
 umf_result_t AllocImpl_deallocate(AllocImpl *ai, void *Ptr, bool *ToPool) {
     if (Ptr == nullptr) {
         return UMF_RESULT_SUCCESS;
@@ -368,27 +324,6 @@ umf_result_t AllocImpl_deallocate(AllocImpl *ai, void *Ptr, bool *ToPool) {
     // but the range checks fail.
     memoryProviderFree(AllocImpl_getMemHandle(ai), Ptr);
     return UMF_RESULT_SUCCESS;
-}
-
-void AllocImpl_printStats(AllocImpl *ai, bool &TitlePrinted,
-                          size_t &HighBucketSize, size_t &HighPeakSlabsInUse,
-                          const std::string &MTName) {
-    (void)TitlePrinted; // TODO
-    (void)MTName;       // TODO
-
-    HighBucketSize = 0;
-    HighPeakSlabsInUse = 0;
-    for (size_t i = 0; i < ai->buckets_num; i++) {
-        // TODO
-        //(*B).printStats(TitlePrinted, MTName);
-        bucket_t *bucket = ai->buckets[i];
-        HighPeakSlabsInUse =
-            utils_max(bucket->maxSlabsInUse, HighPeakSlabsInUse);
-        if (bucket->allocCount) {
-            HighBucketSize =
-                utils_max(bucket_slab_alloc_size(bucket), HighBucketSize);
-        }
-    }
 }
 
 umf_result_t DisjointPool::initialize(umf_memory_provider_handle_t provider,
@@ -509,13 +444,3 @@ static umf_memory_pool_ops_t UMF_DISJOINT_POOL_OPS =
 umf_memory_pool_ops_t *umfDisjointPoolOps(void) {
     return &UMF_DISJOINT_POOL_OPS;
 }
-
-// TODO remove
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-// end TODO remove

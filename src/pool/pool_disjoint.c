@@ -701,6 +701,71 @@ umf_disjoint_pool_params_t *AllocImpl_getParams(AllocImpl *ai) {
     return &ai->params;
 }
 
+size_t AllocImpl_sizeToIdx(AllocImpl *ai, size_t size) {
+    assert(size <= CutOff && "Unexpected size");
+    assert(size > 0 && "Unexpected size");
+
+    size_t MinBucketSize = (size_t)1 << ai->MinBucketSizeExp;
+    if (size < MinBucketSize) {
+        return 0;
+    }
+
+    // Get the position of the leftmost set bit.
+    size_t position = getLeftmostSetBitPos(size);
+
+    bool isPowerOf2 = 0 == (size & (size - 1));
+    bool largerThanHalfwayBetweenPowersOf2 =
+        !isPowerOf2 && (bool)((size - 1) & ((uint64_t)(1) << (position - 1)));
+    size_t index = (position - ai->MinBucketSizeExp) * 2 + (int)(!isPowerOf2) +
+                   (int)largerThanHalfwayBetweenPowersOf2;
+
+    return index;
+}
+
+umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(AllocImpl *ai) {
+    if (ai->params.SharedLimits) {
+        return ai->params.SharedLimits;
+    } else {
+        return ai->DefaultSharedLimits;
+    }
+}
+
+bucket_t *AllocImpl_findBucket(AllocImpl *ai, size_t Size) {
+    size_t calculatedIdx = AllocImpl_sizeToIdx(ai, Size);
+    bucket_t *bucket = ai->buckets[calculatedIdx];
+    assert(bucket_get_size(bucket) >= Size);
+    (void)bucket;
+
+    if (calculatedIdx > 0) {
+        bucket_t *bucket_prev = ai->buckets[calculatedIdx - 1];
+        assert(bucket_get_size(bucket_prev) < Size);
+        (void)bucket_prev;
+    }
+
+    return ai->buckets[calculatedIdx];
+}
+
+void AllocImpl_printStats(AllocImpl *ai, bool *TitlePrinted,
+                          size_t *HighBucketSize, size_t *HighPeakSlabsInUse,
+                          const char *MTName) {
+    (void)TitlePrinted; // TODO
+    (void)MTName;       // TODO
+
+    *HighBucketSize = 0;
+    *HighPeakSlabsInUse = 0;
+    for (size_t i = 0; i < ai->buckets_num; i++) {
+        // TODO
+        //(*B).printStats(TitlePrinted, MTName);
+        bucket_t *bucket = ai->buckets[i];
+        *HighPeakSlabsInUse =
+            utils_max(bucket->maxSlabsInUse, *HighPeakSlabsInUse);
+        if (bucket->allocCount) {
+            *HighBucketSize =
+                utils_max(bucket_slab_alloc_size(bucket), *HighBucketSize);
+        }
+    }
+}
+
 #ifdef __cplusplus
 }
 #endif
