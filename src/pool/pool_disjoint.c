@@ -521,7 +521,9 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
     }
 
     if (bucket_capacity(bucket) >= NewFreeSlabsInBucket) {
-        size_t pool_size = bucket->shared_limits->total_size;
+        size_t pool_size = 0;
+        utils_atomic_load_acquire(&bucket->shared_limits->total_size,
+                                  &pool_size);
         while (true) {
             size_t new_pool_size = pool_size + bucket_slab_alloc_size(bucket);
 
