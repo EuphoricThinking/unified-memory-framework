@@ -14,8 +14,7 @@ if(UMF_BUILD_LIBUMF_POOL_DISJOINT)
     add_umf_library(
         NAME disjoint_pool
         TYPE STATIC
-        SRCS pool_disjoint.c ../critnib/critnib.c
-             ${POOL_EXTRA_SRCS}
+        SRCS pool_disjoint.c ../critnib/critnib.c ${POOL_EXTRA_SRCS}
         LIBS ${POOL_EXTRA_LIBS})
 
     target_compile_definitions(disjoint_pool
