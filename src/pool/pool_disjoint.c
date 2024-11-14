@@ -529,12 +529,14 @@ bool bucket_can_pool(bucket_t *bucket, bool *to_pool) {
                 break;
             }
 
-            // TODO!!!
-            //if (utils_compare_exchange(&bucket->shared_limits->total_size,
-            //                           pool_size, new_pool_size)) {
+// TODO!!!
+#ifdef _WIN32
             if (bucket->shared_limits->total_size != new_pool_size) {
                 bucket->shared_limits->total_size = new_pool_size;
-
+#else
+            if (utils_compare_exchange(&bucket->shared_limits->total_size,
+                                       &pool_size, &new_pool_size)) {
+#endif
                 if (chunkedBucket) {
                     ++bucket->chunkedSlabsInPool;
                 }
@@ -693,7 +695,7 @@ utils_mutex_t *AllocImpl_getKnownSlabsMapLock(AllocImpl *ai) {
 
 critnib *AllocImpl_getKnownSlabs(AllocImpl *ai) { return ai->known_slabs; }
 
-size_t AllocImpl_SlabMinSize(AllocImpl *ai) { return ai->params.SlabMinSize; };
+size_t AllocImpl_SlabMinSize(AllocImpl *ai) { return ai->params.SlabMinSize; }
 
 umf_disjoint_pool_params_t *AllocImpl_getParams(AllocImpl *ai) {
     return &ai->params;
