@@ -6,83 +6,17 @@
  *
  */
 
-/*
- * This file defines a benchmarking framework for evaluating memory allocation
- * and deallocation performance using the Unified Memory Framework (UMF). The
- * design is modular and extensible, allowing for flexible benchmarking of different
- * allocation strategies, size distributions, and memory providers.
- *
- * **Key Design Features:**
- * - **Modular Components**: The framework is built using interfaces and templates,
- *   which allows for easy extension and customization of allocation strategies,
- *   size distributions, and memory providers.
- * - **Flexible Allocation Size Generators**: Includes classes like `fixed_alloc_size`
- *   and `uniform_alloc_size` that generate allocation sizes based on different
- *   strategies. These classes implement the `alloc_size_interface`.
- * - **Abstract Allocator Interface**: The `allocator_interface` defines the basic
- *   methods for memory allocation and deallocation. Concrete allocators like
- *   `provider_allocator` and `pool_allocator` implement this interface to work
- *   with different memory providers and pools.
- * - **Benchmarking Classes**: Classes like `alloc_benchmark` and `multiple_malloc_free_benchmark`
- *   templates the allocation size generator and allocator to perform benchmarks.
- *   It manages the setup, execution, and teardown of the benchmark.
- * - **Threaded Execution Support**: The benchmarks support multi-threaded execution
- *   by maintaining thread-specific allocation data and synchronization.
- *
- * **Component Interactions:**
- * - **Size Generators and Allocators**: The `alloc_benchmark` class uses a size
- *   generator (e.g., `fixed_alloc_size` or `uniform_alloc_size`) to determine the
- *   sizes of memory allocations, and an allocator (e.g., `provider_allocator` or
- *   `pool_allocator`) to perform the actual memory operations.
- * - **Benchmark Execution**: During the benchmark, `alloc_benchmark` repeatedly
- *   calls the `bench` method, which performs allocations and deallocations using
- *   the allocator and size generator.
- * - **Allocator Adapters**: The `provider_allocator` and `pool_allocator` adapt
- *   specific memory providers and pools to the `allocator_interface`, allowing
- *   them to be used interchangeably in the benchmark classes. This abstraction
- *   enables benchmarking different memory management strategies without changing
- *   the core benchmarking logic.
- * - **Pre-allocations and Iterations**: The `alloc_benchmark` can perform a set
- *   number of pre-allocations before the benchmark starts, and manages allocation
- *   and deallocation cycles to simulate memory pressure and fragmentation.
- * - **Derived Benchmarks**: `multiple_malloc_free_benchmark` extends
- *   `alloc_benchmark` to perform multiple random deallocations and reallocations
- *   in each iteration, using a uniform distribution to select which allocations
- *   to free and reallocate. This models workloads with frequent memory churn.
- *
- * **Execution Flow:**
- * 1. **Setup Phase**:
- *    - The benchmark class initializes the size generator and allocator.
- *    - Pre-allocations are performed if specified.
- *    - Thread-specific data structures for allocations are prepared.
- * 2. **Benchmark Loop**:
- *    - For each iteration, the `bench` method is called.
- *    - The size generator provides the next allocation size.
- *    - The allocator performs the allocation.
- *    - Allocations are tracked per thread.
- * 3. **Teardown Phase**:
- *    - All remaining allocations are freed.
- *    - Allocator and size generator are cleaned up.
- *
- * **Customization and Extension:**
- * - New size generators can be created by implementing the `alloc_size_interface`.
- * - New allocators can be adapted by implementing the `allocator_interface`.
- * - Additional benchmarking scenarios can be created by extending `benchmark_interface`.
- */
-
 #include <benchmark/benchmark.h>
 #include <random>
 #include <umf/memory_pool.h>
 #include <umf/memory_provider.h>
-
-#include "benchmark_interfaces.hpp"
 
 struct alloc_data {
     void *ptr;
     size_t size;
 };
 
-#define UMF_BENCHMARK_TEMPLATE_DEFINE(BaseClass, Method, ...)                  \
+#define ALLOC_BENCHMARK_TEMPLATE_DEFINE(BaseClass, Method, ...)                \
     BENCHMARK_TEMPLATE_DEFINE_F(BaseClass, Method, __VA_ARGS__)                \
     (benchmark::State & state) {                                               \
         for (auto _ : state) {                                                 \
@@ -90,266 +24,201 @@ struct alloc_data {
         }                                                                      \
     }
 
-#define UMF_BENCHMARK_REGISTER_F(BaseClass, Method)                            \
-    BENCHMARK_REGISTER_F(BaseClass, Method)                                    \
-        ->ArgNames(                                                            \
-            BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::argsName())      \
-        ->Name(BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::name())       \
-        ->Iterations(                                                          \
-            BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::iterations())
-
-class fixed_alloc_size : public alloc_size_interface {
+class alloc_size_interface {
   public:
-    unsigned SetUp(::benchmark::State &state, unsigned argPos) override {
-        size = state.range(argPos);
-        return argPos + 1;
+    virtual void SetUp([[maybe_unused]] ::benchmark::State &state,
+                       [[maybe_unused]] unsigned r) {}
+    virtual void TearDown([[maybe_unused]] ::benchmark::State &state) {}
+    virtual size_t nextSize() = 0;
+};
+
+class fix_alloc_size : public alloc_size_interface {
+  public:
+    virtual void SetUp(::benchmark::State &state, unsigned r) {
+        size = state.range(r);
     }
-    void TearDown([[maybe_unused]] ::benchmark::State &state) override {}
     size_t nextSize() override { return size; };
-    static std::vector<std::string> argsName() { return {"size"}; }
 
   private:
     size_t size;
 };
 
 class uniform_alloc_size : public alloc_size_interface {
-    using distribution = std::uniform_int_distribution<int64_t>;
+    using distribution = std::uniform_int_distribution<int>;
 
   public:
-    unsigned SetUp(::benchmark::State &state, unsigned argPos) override {
-        auto min = state.range(argPos++);
-        auto max = state.range(argPos++);
-        auto gran = state.range(argPos++);
-        if (min % gran != 0 && max % gran != 0) {
-            state.SkipWithError("min and max must be divisible by granularity");
-            return argPos;
-        }
+    virtual void SetUp(::benchmark::State &state, unsigned r) {
+        dist.param(
+            distribution::param_type(state.range(r), state.range(r + 1)));
+        multiply = state.range(r + 2);
+    }
 
-        dist.param(distribution::param_type(min / gran, max / gran));
-        multiplier = gran;
-        return argPos;
-    }
-    void TearDown([[maybe_unused]] ::benchmark::State &state) override {}
-    size_t nextSize() override { return dist(generator) * multiplier; }
-    static std::vector<std::string> argsName() {
-        return {"min size", "max size", "granularity"};
-    }
+    size_t nextSize() { return dist(generator) * multiply; }
 
   private:
     std::default_random_engine generator;
     distribution dist;
-    size_t multiplier;
+    size_t multiply;
 };
 
-// This class benchmarks speed of alloc() operations.
-template <
-    typename Size, typename Alloc,
-    typename =
-        std::enable_if_t<std::is_base_of<alloc_size_interface, Size>::value>,
-    typename =
-        std::enable_if_t<std::is_base_of<allocator_interface, Alloc>::value>>
-class alloc_benchmark : public benchmark_interface<Size, Alloc> {
-  public:
-    size_t max_allocs = 1000;
-    size_t pre_allocs = 0;
-    void SetUp(::benchmark::State &state) override {
+struct provider_interface {
+    umf_memory_provider_handle_t provider = NULL;
+    virtual void SetUp(::benchmark::State &state) {
+        if (state.thread_index() != 0) {
+            return;
+        }
+        auto umf_result =
+            umfMemoryProviderCreate(getOps(), getParams(), &provider);
+        if (umf_result != UMF_RESULT_SUCCESS) {
+            state.SkipWithError("umfMemoryProviderCreate() failed");
+        }
+    }
+
+    virtual void TearDown([[maybe_unused]] ::benchmark::State &state) {
         if (state.thread_index() != 0) {
             return;
         }
 
-        // unpack arguments
-        int argPos = 0;
-        max_allocs = state.range(argPos++);
-        pre_allocs = state.range(argPos++);
-        // pass rest of the arguments to "alloc_size" and "allocator"
-        argPos = base::alloc_size.SetUp(state, argPos);
-        base::allocator.SetUp(state, argPos);
+        if (provider) {
+            umfMemoryProviderDestroy(provider);
+        }
+    }
 
-        // initialize allocations tracking vectors (one per thread)
-        // and iterators for these vectors.
+    virtual umf_memory_provider_ops_t *getOps() { return nullptr; }
+    virtual void *getParams() { return nullptr; }
+};
+
+template <typename T,
+          typename =
+              std::enable_if_t<std::is_base_of<provider_interface, T>::value>>
+struct pool_interface {
+    virtual void SetUp(::benchmark::State &state) {
+        provider.SetUp(state);
+        if (state.thread_index() != 0) {
+            return;
+        }
+        auto umf_result = umfPoolCreate(getOps(state), provider.provider,
+                                        getParams(state), 0, &pool);
+        if (umf_result != UMF_RESULT_SUCCESS) {
+            state.SkipWithError("umfPoolCreate() failed");
+        }
+    }
+    virtual void TearDown([[maybe_unused]] ::benchmark::State &state) {
+        if (state.thread_index() != 0) {
+            return;
+        }
+        if (pool) {
+            umfPoolDestroy(pool);
+        }
+    };
+
+    virtual umf_memory_pool_ops_t *
+    getOps([[maybe_unused]] ::benchmark::State &state) {
+        return nullptr;
+    }
+    virtual void *getParams([[maybe_unused]] ::benchmark::State &state) {
+        return nullptr;
+    }
+
+    T provider;
+    umf_memory_pool_handle_t pool;
+};
+
+template <typename S,
+          typename =
+              std::enable_if_t<std::is_base_of<alloc_size_interface, S>::value>>
+class alloc_benchmark : public benchmark::Fixture {
+  public:
+    void SetUp(::benchmark::State &state) {
+        if (state.thread_index() != 0) {
+            return;
+        }
+        iterations = state.range(0);
+        size.SetUp(state, 1);
         allocations.resize(state.threads());
-        iters.resize(state.threads());
-
-        for (auto &i : iters) {
-            i = pre_allocs;
-        }
-
-        // do "pre_alloc" allocations before actual benchmark.
         for (auto &i : allocations) {
-            i.resize(max_allocs + pre_allocs);
-
-            for (size_t j = 0; j < pre_allocs; j++) {
-                i[j].ptr =
-                    base::allocator.benchAlloc(base::alloc_size.nextSize());
-                if (i[j].ptr == NULL) {
-                    state.SkipWithError("preallocation failed");
-                    return;
-                }
-                i[j].size = base::alloc_size.nextSize();
-            }
+            i.resize(iterations);
         }
     }
 
-    void TearDown(::benchmark::State &state) override {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        for (auto &i : allocations) {
-            for (auto &j : i) {
-                if (j.ptr != NULL) {
-                    base::allocator.benchFree(j.ptr, j.size);
-                    j.ptr = NULL;
-                    j.size = 0;
-                }
-            }
-        }
+    void TearDown([[maybe_unused]] ::benchmark::State &state) {}
 
-        base::TearDown(state);
-    }
-
-    void bench(benchmark::State &state) override {
+    void bench(benchmark::State &state) {
         auto tid = state.thread_index();
-        auto s = base::alloc_size.nextSize();
-        auto &i = iters[tid];
-        allocations[tid][i].ptr = base::allocator.benchAlloc(s);
-        if (allocations[tid][i].ptr == NULL) {
-            state.SkipWithError("allocation failed");
-            return;
-        }
-        allocations[tid][i].size = s;
-        i++;
-        if (i >= max_allocs + pre_allocs) {
-            // This benchmark tests only allocations -
-            // if allocation tracker is full we pause benchmark to dealloc all allocations -
-            // excluding pre-allocated ones.
-            state.PauseTiming();
-            while (i > pre_allocs) {
-                auto &allocation = allocations[tid][--i];
-                base::allocator.benchFree(allocation.ptr, allocation.size);
-                allocation.ptr = NULL;
-                allocation.size = 0;
-            }
-            state.ResumeTiming();
-        }
-    }
-
-    static std::vector<std::string> argsName() {
-        auto n = benchmark_interface<Size, Alloc>::argsName();
-        std::vector<std::string> res = {"max_allocs", "pre_allocs"};
-        res.insert(res.end(), n.begin(), n.end());
-        return res;
-    }
-
-    static std::string name() { return base::name() + "/alloc"; }
-    static int64_t iterations() { return 200000; }
-
-  protected:
-    using base = benchmark_interface<Size, Alloc>;
-    std::vector<std::vector<alloc_data>> allocations;
-    std::vector<size_t> iters;
-};
-
-// This class benchmarks performance of random deallocations and (re)allocations
-template <
-    typename Size, typename Alloc,
-    typename =
-        std::enable_if_t<std::is_base_of<alloc_size_interface, Size>::value>,
-    typename =
-        std::enable_if_t<std::is_base_of<allocator_interface, Alloc>::value>>
-class multiple_malloc_free_benchmark : public alloc_benchmark<Size, Alloc> {
-    using distribution = std::uniform_int_distribution<size_t>;
-    using base = alloc_benchmark<Size, Alloc>;
-
-  public:
-    int reallocs = 100;
-    void SetUp(::benchmark::State &state) override {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        // unpack arguments
-        int argPos = 0;
-        base::max_allocs = state.range(argPos++);
-
-        // pass rest of the arguments to "alloc_size" and "allocator"
-        argPos = base::alloc_size.SetUp(state, argPos);
-        base::allocator.SetUp(state, argPos);
-
-        // perform initial allocations which will be later freed and reallocated
-        base::allocations.resize(state.threads());
-        for (auto &i : base::allocations) {
-            i.resize(base::max_allocs);
-
-            for (size_t j = 0; j < base::max_allocs; j++) {
-                i[j].ptr =
-                    base::allocator.benchAlloc(base::alloc_size.nextSize());
-                if (i[j].ptr == NULL) {
-                    state.SkipWithError("preallocation failed");
-                    return;
-                }
-                i[j].size = base::alloc_size.nextSize();
-            }
-        }
-        dist.param(distribution::param_type(0, base::max_allocs - 1));
-    }
-
-    void bench(benchmark::State &state) override {
-        auto tid = state.thread_index();
-        auto &allocation = base::allocations[tid];
-        std::vector<size_t> to_alloc;
-        for (int j = 0; j < reallocs; j++) {
-            auto idx = dist(generator);
-            if (allocation[idx].ptr == NULL) {
-                continue;
-            }
-            to_alloc.push_back(idx);
-
-            base::allocator.benchFree(allocation[idx].ptr,
-                                      allocation[idx].size);
-            allocation[idx].ptr = NULL;
-            allocation[idx].size = 0;
-        }
-
-        for (auto idx : to_alloc) {
-            auto s = base::alloc_size.nextSize();
-            allocation[idx].ptr = base::allocator.benchAlloc(s);
-            if (allocation[idx].ptr == NULL) {
+        for (size_t i = 0; i < iterations; i++) {
+            auto s = size.nextSize();
+            allocations[tid][i].ptr = benchAlloc(s);
+            if (allocations[tid][i].ptr == NULL) {
                 state.SkipWithError("allocation failed");
             }
-            allocation[idx].size = s;
+            allocations[tid][i].size = s;
+        }
+        for (size_t i = 0; i < iterations; i++) {
+            benchFree(allocations[tid][i].ptr, allocations[tid][i].size);
         }
     }
 
-    static std::string name() {
-        return base::base::name() + "/multiple_malloc_free";
+  protected:
+    std::vector<std::vector<alloc_data>> allocations;
+    size_t iterations;
+
+  private:
+    S size;
+    virtual void *benchAlloc(size_t size) { return malloc(size); }
+    virtual void benchFree(void *ptr, [[maybe_unused]] size_t size) {
+        free(ptr);
     }
-
-    static std::vector<std::string> argsName() {
-        auto n = benchmark_interface<Size, Alloc>::argsName();
-        std::vector<std::string> res = {"max_allocs"};
-        res.insert(res.end(), n.begin(), n.end());
-        return res;
-    }
-
-    static int64_t iterations() { return 2000; }
-
-    std::default_random_engine generator;
-    distribution dist;
 };
 
-template <typename Provider, typename = std::enable_if_t<std::is_base_of<
-                                 provider_interface, Provider>::value>>
-class provider_allocator : public allocator_interface {
+// TODO: implement jemalloc benchmark without umf
+// #include <dlfcn.h>
+// template <typename S,
+//           typename =
+//               std::enable_if_t<std::is_base_of<alloc_size_interface, S>::value>>
+// class jemallocBenchmark : public allocBenchmark<S> {
+//     void SetUp(::benchmark::State &state) {
+//         allocBenchmark<S>::SetUp(state);
+//         jemalloc_handle = dlopen("libjemalloc.so", RTLD_NOW);
+//         malloc_func = (void *(*)(size_t))dlsym(jemalloc_handle, "malloc");
+//         free_func = (void (*)(void *))dlsym(jemalloc_handle, "free");
+//     }
+
+//     void TearDown([[maybe_unused]] ::benchmark::State &state) {
+//         dlclose(jemalloc_handle);
+//     }
+
+//   private:
+//     void *(*malloc_func)(size_t);
+//     void (*free_func)(void *);
+//     void *jemalloc_handle;
+//     virtual void *benchAlloc(size_t size) override { return malloc_func(size); }
+//     virtual void benchFree(void *ptr, [[maybe_unused]] size_t size) override {
+//         free_func(ptr);
+//     }
+// };
+
+template <typename T, typename S,
+          typename =
+              std::enable_if_t<std::is_base_of<provider_interface, T>::value>,
+          typename =
+              std::enable_if_t<std::is_base_of<alloc_size_interface, S>::value>>
+class provider_benchmark : public alloc_benchmark<S> {
   public:
-    unsigned SetUp(::benchmark::State &state, unsigned r) override {
+    void SetUp(::benchmark::State &state) {
+        alloc_benchmark<S>::SetUp(state);
         provider.SetUp(state);
-        return r;
     }
 
-    void TearDown(::benchmark::State &state) override {
+    void TearDown(::benchmark::State &state) {
+        alloc_benchmark<S>::TearDown(state);
         provider.TearDown(state);
     }
 
-    void *benchAlloc(size_t size) override {
+  protected:
+    T provider;
+
+  private:
+    virtual void *benchAlloc(size_t size) override {
         void *ptr;
         if (umfMemoryProviderAlloc(provider.provider, size, 0, &ptr) !=
             UMF_RESULT_SUCCESS) {
@@ -357,37 +226,35 @@ class provider_allocator : public allocator_interface {
         }
         return ptr;
     }
-
-    void benchFree(void *ptr, size_t size) override {
+    virtual void benchFree(void *ptr, size_t size) override {
         umfMemoryProviderFree(provider.provider, ptr, size);
     }
-
-    static std::string name() { return Provider::name(); }
-
-  private:
-    Provider provider;
 };
 
-// TODO: assert Pool to be a pool_interface<provider_interface>.
-template <typename Pool> class pool_allocator : public allocator_interface {
+// TODO: assert T to be a pool_interface<provider_interface>.
+template <typename T, typename S,
+          typename =
+              std::enable_if_t<std::is_base_of<alloc_size_interface, S>::value>>
+class pool_benchmark : public alloc_benchmark<S> {
   public:
-    unsigned SetUp(::benchmark::State &state, unsigned r) override {
+    void SetUp(::benchmark::State &state) {
+        alloc_benchmark<S>::SetUp(state);
         pool.SetUp(state);
-        return r;
     }
 
-    void TearDown(::benchmark::State &state) override { pool.TearDown(state); }
+    void TearDown(::benchmark::State &state) {
+        alloc_benchmark<S>::TearDown(state);
+        pool.TearDown(state);
+    }
 
+  protected:
+    T pool;
+
+  private:
     virtual void *benchAlloc(size_t size) override {
         return umfPoolMalloc(pool.pool, size);
     }
-
     virtual void benchFree(void *ptr, [[maybe_unused]] size_t size) override {
         umfPoolFree(pool.pool, ptr);
     }
-
-    static std::string name() { return Pool::name(); }
-
-  private:
-    Pool pool;
 };
