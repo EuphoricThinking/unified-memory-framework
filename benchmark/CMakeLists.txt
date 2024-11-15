@@ -2,20 +2,27 @@
 # Under the Apache License v2.0 with LLVM Exceptions. See LICENSE.TXT.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# In MSVC builds, there is no way to determine the actual build type during the
-# CMake configuration step. Therefore, this message is printed in all MSVC
-# builds.
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-
 include(FetchContent)
 FetchContent_Declare(
     googlebenchmark
     GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG v1.9.0)
+    GIT_TAG v1.9.0
+    EXCLUDE_FROM_ALL)
+
+set(BENCHMARK_ENABLE_GTEST_TESTS
+    OFF
+    CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_TESTING
+    OFF
+    CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_INSTALL
+    OFF
+    CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googlebenchmark)
 
+# In MSVC builds, there is no way to determine the actual build type during the
+# CMake configuration step. Therefore, this message is printed in all MSVC
+# builds.
 if(WINDOWS OR NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     message(
         STATUS
@@ -65,6 +72,8 @@ function(add_umf_benchmark)
         NAME ${BENCH_NAME}
         COMMAND ${BENCH_NAME}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+    set_tests_properties(${BENCH_NAME} PROPERTIES LABELS "benchmark")
 
     if(WINDOWS)
         # append PATH to DLLs
@@ -118,8 +127,21 @@ endif()
 # BENCHMARKS
 
 add_umf_benchmark(
+    NAME ubench
+    SRCS ubench.c
+    LIBS ${LIBS_OPTIONAL}
+    LIBDIRS ${LIB_DIRS})
+
+add_umf_benchmark(
     NAME benchmark
     SRCS benchmark.cpp
     LIBS ${LIBS_OPTIONAL} benchmark::benchmark
     LIBDIRS ${LIB_DIRS})
 
+if(UMF_BUILD_BENCHMARKS_MT)
+    add_umf_benchmark(
+        NAME multithreaded
+        SRCS multithread.cpp
+        LIBS ${LIBS_OPTIONAL} ${CMAKE_THREAD_LIBS_INIT}
+        LIBDIRS ${LIB_DIRS})
+endif()
