@@ -37,7 +37,7 @@ For development and contributions:
 - cmake-format-0.6 (can be installed with `python -m pip install cmake-format==0.6.13`)
 - black (can be installed with `python -m pip install black==24.3.0`)
 
-For building tests, multithreaded benchmarks and Disjoint Pool:
+For building tests, multithreaded benchmarks:
 - C++ compiler with C++17 support
 
 For Level Zero memory provider tests:
@@ -100,7 +100,7 @@ List of options provided by CMake:
 | UMF_BUILD_SHARED_LIBRARY | Build UMF as shared library | ON/OFF | OFF |
 | UMF_BUILD_LEVEL_ZERO_PROVIDER | Build Level Zero memory provider | ON/OFF | ON |
 | UMF_BUILD_CUDA_PROVIDER | Build CUDA memory provider | ON/OFF | ON |
-| UMF_BUILD_LIBUMF_POOL_DISJOINT | Build the libumf_pool_disjoint static library | ON/OFF | OFF |
+| UMF_BUILD_LIBUMF_POOL_DISJOINT | Build the libumf_pool_disjoint static library | ON/OFF | ON |
 | UMF_BUILD_LIBUMF_POOL_JEMALLOC | Build the libumf_pool_jemalloc static library | ON/OFF | OFF |
 | UMF_BUILD_TESTS | Build UMF tests | ON/OFF | ON |
 | UMF_BUILD_GPU_TESTS | Build UMF GPU tests | ON/OFF | OFF |

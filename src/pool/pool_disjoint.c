@@ -745,7 +745,8 @@ void slab_unreg_by_addr(void *addr, slab_t *slab) {
     utils_mutex_unlock(lock);
 }
 
-size_t AllocImpl_sizeToIdx(disjoint_pool_t *pool, size_t size) {
+//TODO add static
+static size_t size_to_idx(disjoint_pool_t *pool, size_t size) {
     assert(size <= CutOff && "Unexpected size");
     assert(size > 0 && "Unexpected size");
 
@@ -768,7 +769,8 @@ size_t AllocImpl_sizeToIdx(disjoint_pool_t *pool, size_t size) {
     return index;
 }
 
-umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(disjoint_pool_t *pool) {
+umf_disjoint_pool_shared_limits_t *
+disjoint_pool_get_limits(disjoint_pool_t *pool) {
     if (pool->params.SharedLimits) {
         return pool->params.SharedLimits;
     } else {
@@ -776,54 +778,48 @@ umf_disjoint_pool_shared_limits_t *AllocImpl_getLimits(disjoint_pool_t *pool) {
     }
 }
 
-bucket_t *AllocImpl_findBucket(disjoint_pool_t *pool, size_t Size) {
-    size_t calculatedIdx = AllocImpl_sizeToIdx(pool, Size);
-    bucket_t *bucket = pool->buckets[calculatedIdx];
-    assert(bucket->size >= Size);
+bucket_t *disjoint_pool_find_bucket(disjoint_pool_t *pool, size_t size) {
+    size_t calculated_idx = size_to_idx(pool, size);
+    bucket_t *bucket = pool->buckets[calculated_idx];
+
+    // debug check
+    assert(bucket->size >= size);
     (void)bucket;
 
-    if (calculatedIdx > 0) {
-        bucket_t *bucket_prev = pool->buckets[calculatedIdx - 1];
-        assert(bucket_prev->size < Size);
+    if (calculated_idx > 0) {
+        bucket_t *bucket_prev = pool->buckets[calculated_idx - 1];
+
+        // debug check
+        assert(bucket_prev->size < size);
         (void)bucket_prev;
     }
 
-    return pool->buckets[calculatedIdx];
+    return pool->buckets[calculated_idx];
 }
 
-void AllocImpl_printStats(disjoint_pool_t *pool, bool *TitlePrinted,
-                          size_t *HighBucketSize, size_t *HighPeakSlabsInUse,
-                          const char *MTName) {
-    (void)TitlePrinted; // TODO
-    (void)MTName;       // TODO
+void disjoint_pool_print_stats(disjoint_pool_t *pool, bool *title_printed,
+                               size_t *high_bucket_size,
+                               size_t *high_peak_slabs_in_use,
+                               const char *mt_name) {
+    (void)title_printed; // TODO
+    (void)mt_name;       // TODO
 
-    *HighBucketSize = 0;
-    *HighPeakSlabsInUse = 0;
+    *high_bucket_size = 0;
+    *high_peak_slabs_in_use = 0;
     for (size_t i = 0; i < pool->buckets_num; i++) {
         // TODO
-        //(*B).printStats(TitlePrinted, MTName);
+        //(*B).disjoint_pool_print_stats(title_printed, mt_name);
         bucket_t *bucket = pool->buckets[i];
-        *HighPeakSlabsInUse =
-            utils_max(bucket->max_slabs_in_use, *HighPeakSlabsInUse);
+        *high_peak_slabs_in_use =
+            utils_max(bucket->max_slabs_in_use, *high_peak_slabs_in_use);
         if (bucket->alloc_count) {
-            *HighBucketSize =
-                utils_max(bucket_slab_alloc_size(bucket), *HighBucketSize);
+            *high_bucket_size =
+                utils_max(bucket_slab_alloc_size(bucket), *high_bucket_size);
         }
     }
 }
 
-static void *memoryProviderAlloc(umf_memory_provider_handle_t hProvider,
-                                 size_t size, size_t alignment) {
-    void *ptr;
-    umf_result_t ret = umfMemoryProviderAlloc(hProvider, size, alignment, &ptr);
-    if (ret != UMF_RESULT_SUCCESS) {
-        TLS_last_allocation_error = ret;
-        return NULL;
-    }
-    annotate_memory_inaccessible(ptr, size);
-    return ptr;
-}
-
+// TODO remove
 static umf_result_t memoryProviderFree(umf_memory_provider_handle_t hProvider,
                                        void *ptr) {
     size_t size = 0;
@@ -846,158 +842,49 @@ static umf_result_t memoryProviderFree(umf_memory_provider_handle_t hProvider,
     return UMF_RESULT_SUCCESS;
 }
 
-void *AllocImpl_allocate(disjoint_pool_t *pool, size_t Size, bool *FromPool) {
-    void *Ptr;
-
-    if (Size == 0) {
+void *disjoint_pool_allocate(disjoint_pool_t *pool, size_t size,
+                             bool *from_pool) {
+    if (size == 0) {
         return NULL;
     }
 
-    *FromPool = false;
-    if (Size > pool->params.MaxPoolableSize) {
-        Ptr = memoryProviderAlloc(pool->provider, Size, 0);
+    void *ptr = NULL;
 
-        if (Ptr == NULL) {
-            // TODO get code from func
-            TLS_last_allocation_error = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+    if (size > pool->params.MaxPoolableSize) {
+        umf_result_t ret =
+            umfMemoryProviderAlloc(pool->provider, size, 0, &ptr);
+        if (ret != UMF_RESULT_SUCCESS) {
+            TLS_last_allocation_error = ret;
             return NULL;
         }
 
-        annotate_memory_undefined(Ptr, Size);
-        return Ptr;
+        annotate_memory_undefined(ptr, size);
+        return ptr;
     }
 
-    bucket_t *bucket = AllocImpl_findBucket(pool, Size);
+    *from_pool = false;
+    bucket_t *bucket = disjoint_pool_find_bucket(pool, size);
 
-    if (Size > bucket_chunk_cut_off(bucket)) {
-        Ptr = bucket_get_slab(bucket, FromPool);
+    if (size > bucket_chunk_cut_off(bucket)) {
+        ptr = bucket_get_slab(bucket, from_pool);
     } else {
-        Ptr = bucket_get_chunk(bucket, FromPool);
+        ptr = bucket_get_chunk(bucket, from_pool);
     }
 
-    if (Ptr == NULL) {
+    if (ptr == NULL) {
         // TODO get code from func
         TLS_last_allocation_error = UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
         return NULL;
     }
 
     if (pool->params.PoolTrace > 1) {
-        bucket_count_alloc(bucket, FromPool);
+        bucket_count_alloc(bucket, from_pool);
     }
 
-    VALGRIND_DO_MEMPOOL_ALLOC(pool, Ptr, Size);
-    annotate_memory_undefined(Ptr, bucket->size);
+    VALGRIND_DO_MEMPOOL_ALLOC(pool, ptr, size);
+    annotate_memory_undefined(ptr, bucket->size);
 
-    return Ptr;
-}
-
-void *AllocImpl_allocate_align(disjoint_pool_t *pool, size_t Size,
-                               size_t Alignment, bool *FromPool) {
-    void *Ptr;
-
-    if (Size == 0) {
-        return NULL;
-    }
-
-    if (Alignment <= 1) {
-        return AllocImpl_allocate(pool, Size, FromPool);
-    }
-
-    size_t AlignedSize;
-    if (Alignment <= pool->provider_min_page_size) {
-        // This allocation will be served from a Bucket which size is multiple
-        // of Alignment and Slab address is aligned to provider_min_page_size
-        // so the address will be properly aligned.
-        AlignedSize = (Size > 1) ? ALIGN_UP(Size, Alignment) : Alignment;
-    } else {
-        // Slabs are only aligned to provider_min_page_size, we need to compensate
-        // for that in case the allocation is within pooling limit.
-        // TODO: consider creating properly-aligned Slabs on demand
-        AlignedSize = Size + Alignment - 1;
-    }
-
-    // Check if requested allocation size is within pooling limit.
-    // If not, just request aligned pointer from the system.
-    *FromPool = false;
-    if (AlignedSize > pool->params.MaxPoolableSize) {
-        Ptr = memoryProviderAlloc(pool->provider, Size, Alignment);
-        assert(Ptr);
-        annotate_memory_undefined(Ptr, Size);
-        return Ptr;
-    }
-
-    bucket_t *bucket = AllocImpl_findBucket(pool, AlignedSize);
-
-    if (AlignedSize > bucket_chunk_cut_off(bucket)) {
-        Ptr = bucket_get_slab(bucket, FromPool);
-    } else {
-        Ptr = bucket_get_chunk(bucket, FromPool);
-    }
-
-    assert(Ptr);
-    if (pool->params.PoolTrace > 1) {
-        bucket_count_alloc(bucket, FromPool);
-    }
-
-    VALGRIND_DO_MEMPOOL_ALLOC(pool, ALIGN_UP((size_t)Ptr, Alignment), Size);
-    annotate_memory_undefined((void *)ALIGN_UP((size_t)Ptr, Alignment), Size);
-    return (void *)ALIGN_UP((size_t)Ptr, Alignment);
-}
-
-umf_result_t AllocImpl_deallocate(disjoint_pool_t *pool, void *Ptr,
-                                  bool *to_pool) {
-    if (Ptr == NULL) {
-        return UMF_RESULT_SUCCESS;
-    }
-
-    void *SlabPtr = (void *)ALIGN_DOWN((size_t)Ptr, pool->params.SlabMinSize);
-
-    // Lock the map on read
-    utils_mutex_lock(&pool->known_slabs_map_lock);
-
-    *to_pool = false;
-
-    slab_t *slab = (slab_t *)critnib_get(pool->known_slabs, (uintptr_t)SlabPtr);
-    //auto Slabs = getKnownSlabs().equal_range(SlabPtr);
-    if (slab == NULL) {
-        utils_mutex_unlock(&pool->known_slabs_map_lock);
-        umf_result_t ret = memoryProviderFree(pool->provider, Ptr);
-        return ret;
-    }
-
-    // TODO - no multimap
-    // for (auto It = Slabs.first; It != Slabs.second; ++It) {
-
-    // The slab object won't be deleted until it's removed from the map which is
-    // protected by the lock, so it's safe to access it here.
-    if (Ptr >= slab_get(slab) && Ptr < slab_get_end(slab)) {
-        // Unlock the map before freeing the chunk, it may be locked on write
-        // there
-        utils_mutex_unlock(&pool->known_slabs_map_lock);
-        bucket_t *bucket = slab->bucket;
-
-        if (pool->params.PoolTrace > 1) {
-            bucket->free_count++;
-        }
-
-        VALGRIND_DO_MEMPOOL_FREE(pool, Ptr);
-        annotate_memory_inaccessible(Ptr, bucket->size);
-        if (bucket->size <= bucket_chunk_cut_off(bucket)) {
-            bucket_free_chunk(bucket, Ptr, slab, to_pool);
-        } else {
-            bucket_free_slab(bucket, slab, to_pool);
-        }
-
-        return UMF_RESULT_SUCCESS;
-    }
-    //} // for multimap
-
-    utils_mutex_unlock(&pool->known_slabs_map_lock);
-    // There is a rare case when we have a pointer from system allocation next
-    // to some slab with an entry in the map. So we find a slab
-    // but the range checks fail.
-    memoryProviderFree(pool->provider, Ptr);
-    return UMF_RESULT_SUCCESS;
+    return ptr;
 }
 
 /*
@@ -1090,12 +977,12 @@ umf_result_t disjoint_pool_initialize(umf_memory_provider_handle_t provider,
     Size2 = ts2;
     for (; Size2 < CutOff; Size1 *= 2, Size2 *= 2, i += 2) {
         disjoint_pool->buckets[i] = create_bucket(
-            Size1, disjoint_pool, AllocImpl_getLimits(disjoint_pool));
+            Size1, disjoint_pool, disjoint_pool_get_limits(disjoint_pool));
         disjoint_pool->buckets[i + 1] = create_bucket(
-            Size2, disjoint_pool, AllocImpl_getLimits(disjoint_pool));
+            Size2, disjoint_pool, disjoint_pool_get_limits(disjoint_pool));
     }
     disjoint_pool->buckets[i] = create_bucket(
-        CutOff, disjoint_pool, AllocImpl_getLimits(disjoint_pool));
+        CutOff, disjoint_pool, disjoint_pool_get_limits(disjoint_pool));
 
     umf_result_t ret = umfMemoryProviderGetMinPageSize(
         provider, NULL, &disjoint_pool->provider_min_page_size);
@@ -1114,17 +1001,18 @@ void *disjoint_pool_malloc(void *pool, size_t size) {
 
     disjoint_pool_t *hPool = (disjoint_pool_t *)pool;
 
-    bool FromPool;
-    void *Ptr = AllocImpl_allocate(hPool, size, &FromPool);
+    bool from_pool;
+    void *ptr = disjoint_pool_allocate(hPool, size, &from_pool);
 
     if (hPool->params.PoolTrace > 2) {
         const char *MT = hPool->params.Name;
         (void)MT;
         //std::cout << "Allocated " << std::setw(8) << size << " " << MT
         //          << " bytes from " << (FromPool ? "Pool" : "Provider") << " ->"
-        //          << Ptr << std::endl;
+        //          << ptr << std::endl;
     }
-    return Ptr;
+
+    return ptr;
 }
 
 void *disjoint_pool_calloc(void *pool, size_t num, size_t size) {
@@ -1148,13 +1036,69 @@ void *disjoint_pool_realloc(void *pool, void *ptr, size_t size) {
 }
 
 void *disjoint_pool_aligned_malloc(void *pool, size_t size, size_t alignment) {
-    disjoint_pool_t *hPool = (disjoint_pool_t *)pool;
+    disjoint_pool_t *disjoint_pool = (disjoint_pool_t *)pool;
 
-    bool FromPool;
-    void *Ptr = AllocImpl_allocate_align(hPool, size, alignment, &FromPool);
+    bool from_pool;
+    void *ptr = NULL;
 
-    if (hPool->params.PoolTrace > 2) {
-        const char *MT = hPool->params.Name;
+    if (size == 0) {
+        return NULL;
+    }
+
+    if (alignment <= 1) {
+        return disjoint_pool_allocate(pool, size, &from_pool);
+    }
+
+    size_t aligned_size;
+    if (alignment <= disjoint_pool->provider_min_page_size) {
+        // This allocation will be served from a Bucket which size is multiple
+        // of Alignment and Slab address is aligned to provider_min_page_size
+        // so the address will be properly aligned.
+        aligned_size = (size > 1) ? ALIGN_UP(size, alignment) : alignment;
+    } else {
+        // Slabs are only aligned to provider_min_page_size, we need to compensate
+        // for that in case the allocation is within pooling limit.
+        // TODO: consider creating properly-aligned Slabs on demand
+        aligned_size = size + alignment - 1;
+    }
+
+    // Check if requested allocation size is within pooling limit.
+    // If not, just request aligned pointer from the system.
+    from_pool = false;
+    if (aligned_size > disjoint_pool->params.MaxPoolableSize) {
+
+        umf_result_t ret = umfMemoryProviderAlloc(disjoint_pool->provider, size,
+                                                  alignment, &ptr);
+        if (ret != UMF_RESULT_SUCCESS) {
+            TLS_last_allocation_error = ret;
+            return NULL;
+        }
+
+        assert(ptr);
+        annotate_memory_undefined(ptr, size);
+        return ptr;
+    }
+
+    bucket_t *bucket = disjoint_pool_find_bucket(pool, aligned_size);
+
+    if (aligned_size > bucket_chunk_cut_off(bucket)) {
+        ptr = bucket_get_slab(bucket, &from_pool);
+    } else {
+        ptr = bucket_get_chunk(bucket, &from_pool);
+    }
+
+    assert(ptr);
+    if (disjoint_pool->params.PoolTrace > 1) {
+        bucket_count_alloc(bucket, &from_pool);
+    }
+
+    VALGRIND_DO_MEMPOOL_ALLOC(disjoint_pool, ALIGN_UP((size_t)ptr, alignment),
+                              size);
+    annotate_memory_undefined((void *)ALIGN_UP((size_t)ptr, alignment), size);
+    return (void *)ALIGN_UP((size_t)ptr, alignment);
+
+    if (disjoint_pool->params.PoolTrace > 2) {
+        const char *MT = disjoint_pool->params.Name;
         (void)MT;
         //std::cout << "Allocated " << std::setw(8) << size << " " << MT
         //          << " bytes aligned at " << alignment << " from "
@@ -1162,7 +1106,7 @@ void *disjoint_pool_aligned_malloc(void *pool, size_t size, size_t alignment) {
         //          << std::endl;
     }
 
-    return Ptr;
+    return ptr;
 }
 
 size_t disjoint_pool_malloc_usable_size(void *pool, void *ptr) {
@@ -1174,10 +1118,54 @@ size_t disjoint_pool_malloc_usable_size(void *pool, void *ptr) {
 }
 
 umf_result_t disjoint_pool_free(void *pool, void *ptr) {
-    disjoint_pool_t *hPool = (disjoint_pool_t *)pool;
+    disjoint_pool_t *disjoint_pool = (disjoint_pool_t *)pool;
+    if (ptr == NULL) {
+        return UMF_RESULT_SUCCESS;
+    }
 
-    bool ToPool;
-    umf_result_t ret = AllocImpl_deallocate(hPool, ptr, &ToPool);
+    void *slab_ptr =
+        (void *)ALIGN_DOWN((size_t)ptr, disjoint_pool->params.SlabMinSize);
+
+    // Lock the map on read
+    utils_mutex_lock(&disjoint_pool->known_slabs_map_lock);
+
+    slab_t *slab =
+        (slab_t *)critnib_get(disjoint_pool->known_slabs, (uintptr_t)slab_ptr);
+    //auto Slabs = getKnownSlabs().equal_range(SlabPtr);
+    if (slab == NULL) {
+        utils_mutex_unlock(&disjoint_pool->known_slabs_map_lock);
+        umf_result_t ret = memoryProviderFree(disjoint_pool->provider, ptr);
+        return ret;
+    }
+
+    bool to_pool = false;
+    // TODO - no multimap
+    // for (auto It = Slabs.first; It != Slabs.second; ++It) {
+
+    // The slab object won't be deleted until it's removed from the map which is
+    // protected by the lock, so it's safe to access it here.
+    if (ptr >= slab_get(slab) && ptr < slab_get_end(slab)) {
+        // Unlock the map before freeing the chunk, it may be locked on write
+        // there
+        utils_mutex_unlock(&disjoint_pool->known_slabs_map_lock);
+        bucket_t *bucket = slab->bucket;
+
+        if (disjoint_pool->params.PoolTrace > 1) {
+            bucket->free_count++;
+        }
+
+        VALGRIND_DO_MEMPOOL_FREE(pool, ptr);
+        annotate_memory_inaccessible(ptr, bucket->size);
+        if (bucket->size <= bucket_chunk_cut_off(bucket)) {
+            bucket_free_chunk(bucket, ptr, slab, &to_pool);
+        } else {
+            bucket_free_slab(bucket, slab, &to_pool);
+        }
+
+        return UMF_RESULT_SUCCESS;
+    }
+    //} // for multimap
+
     /*
     if (ret == UMF_RESULT_SUCCESS) {
 
@@ -1191,7 +1179,12 @@ umf_result_t disjoint_pool_free(void *pool, void *ptr) {
                       << impl->getParams().CurPoolSize << "\n";
         }
     }*/
-    return ret;
+
+    // There is a rare case when we have a pointer from system allocation next
+    // to some slab with an entry in the map. So we find a slab
+    // but the range checks fail.
+    assert(0);
+    return UMF_RESULT_ERROR_MEMORY_PROVIDER_SPECIFIC;
 }
 
 umf_result_t disjoint_pool_get_last_allocation_error(void *pool) {
@@ -1225,7 +1218,7 @@ void disjoint_pool_finalize(void *pool) {
         size_t HighPeakSlabsInUse;
         auto name = impl->getParams().Name;
         //try { // cannot throw in destructor
-        impl->printStats(TitlePrinted, HighBucketSize, HighPeakSlabsInUse,
+        impl->disjoint_pool_print_stats(TitlePrinted, HighBucketSize, HighPeakSlabsInUse,
                          name);
         if (TitlePrinted) {
             std::cout << "Current Pool Size "
