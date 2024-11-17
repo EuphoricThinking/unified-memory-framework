@@ -35,7 +35,7 @@ class Benchmark:
         return run(
             command=command,
             env_vars=env_vars_with_forced_adapter,
-            add_sycl=True,
+            add_sycl=options.sycl is not None,
             cwd=options.benchmark_cwd
         ).stdout.decode()
 
