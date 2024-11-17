@@ -10,6 +10,7 @@ from benches.velocity import VelocityBench
 from benches.syclbench import *
 from benches.test import TestSuite
 from benches.options import Compare, options
+from benches.umf import UMFSuite
 from output_markdown import generate_markdown
 from output_html import generate_html
 from history import BenchmarkHistory
@@ -25,7 +26,7 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     prepare_workdir(directory, INTERNAL_WORKDIR_VERSION)
 
     suites = [
-        
+        UMFSuite(directory),
         # ComputeBench(directory),
         # VelocityBench(directory),
         # SyclBench(directory)
