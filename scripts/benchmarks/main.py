@@ -25,9 +25,10 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     prepare_workdir(directory, INTERNAL_WORKDIR_VERSION)
 
     suites = [
-        ComputeBench(directory),
-        VelocityBench(directory),
-        SyclBench(directory)
+        
+        # ComputeBench(directory),
+        # VelocityBench(directory),
+        # SyclBench(directory)
         #TestSuite()
     ] if not options.dry_run else []
 
