@@ -10,25 +10,27 @@ from .result import Result
 from utils.utils import run, create_build_path
 from .options import options
 import os
+import csv
+import io
+
+def isUmfNotAvailable():
+    if options.umf is None:
+        return True
+    return False
 
 class UMFSuite(Suite):    
     def __init__(self, directory):
         self.directory = directory
-        if self.isUmfNotAvailable():
-            print("UMF install prefix path not provided")
-
-    def isUmfNotAvailable(self):
-        if options.umf is None:
-            return True
-        return False
+        if isUmfNotAvailable():
+            print("UMF install prefix path not provided SUITE")
     
     def setup(self):
-        if self.isUmfNotAvailable():
+        if isUmfNotAvailable():
             return
         self.built = True
 
     def benchmarks(self) -> list[Benchmark]:
-        if self.isUmfNotAvailable():
+        if isUmfNotAvailable():
             return
         
         benches = [
@@ -53,7 +55,11 @@ class ComputeUMFBenchmark(Benchmark):
         return "μs"
 
     def setup(self):
-        self.benchmark_bin = os.path.join(self.bench.directory, 'benchmark', self.bench_name)
+        if isUmfNotAvailable:
+            print("UMF prefix path not provided BENCHMARK", options.umf)
+            # return
+
+        self.benchmark_bin = os.path.join(options.umf, 'benchmark', self.bench_name)
 
     def run(self, env_vars) -> list[Result]:
         command = [
@@ -63,6 +69,7 @@ class ComputeUMFBenchmark(Benchmark):
         #     "--noHeaders"
         ]
 
+        print("benchmark path", self.benchmark_bin)
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
@@ -89,6 +96,10 @@ class ComputeUMFBenchmark(Benchmark):
     
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
-        super().__init__(self, bench, "umf-benchmark")
+        super().__init__(bench, "umf-benchmark")
+
+    def name(self):
+        return self.bench_name
+
 
     
