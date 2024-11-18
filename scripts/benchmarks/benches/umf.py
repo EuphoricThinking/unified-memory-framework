@@ -78,7 +78,7 @@ class ComputeUMFBenchmark(Benchmark):
 
     def parse_output(self, output):
         csv_file = io.StringIO(output)
-        print("RESULT\n", csv_file.read())
+        # print("RESULT\n", csv_file.read())
         reader = csv.reader(csv_file)
         next(reader, None)
         data_row = next(reader, None)
@@ -103,6 +103,9 @@ class GBench(ComputeUMFBenchmark):
         return self.bench_name
 
     def bin_args(self):
-        return ["--benchmark_out_format=csv"]
+        return ["--benchmark_format=csv"]
+    # --benchmark_format describes stdout output
+    # --benchmark_out=<file> and --benchmark_out_format=<format>
+    # describe output to a file 
 
     
