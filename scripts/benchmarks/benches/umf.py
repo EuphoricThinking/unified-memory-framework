@@ -13,24 +13,22 @@ import os
 import csv
 import io
 
-def isUmfNotAvailable():
-    if options.umf is None:
-        return True
-    return False
+def isUMFAvailable():
+    return options.umf is not None
 
 class UMFSuite(Suite):    
     def __init__(self, directory):
         self.directory = directory
-        if isUmfNotAvailable():
+        if not isUMFAvailable():
             print("UMF install prefix path not provided SUITE")
     
     def setup(self):
-        if isUmfNotAvailable():
+        if not isUMFAvailable():
             return
         self.built = True
 
     def benchmarks(self) -> list[Benchmark]:
-        if isUmfNotAvailable():
+        if not isUMFAvailable():
             return
         
         benches = [
@@ -55,9 +53,9 @@ class ComputeUMFBenchmark(Benchmark):
         return "μs"
 
     def setup(self):
-        if isUmfNotAvailable:
+        if not isUMFAvailable():
             print("UMF prefix path not provided BENCHMARK", options.umf)
-            # return
+            return
 
         self.benchmark_bin = os.path.join(options.umf, 'benchmark', self.bench_name)
 
@@ -74,11 +72,13 @@ class ComputeUMFBenchmark(Benchmark):
         env_vars.update(self.extra_env_vars())
 
         result = self.run_bench(command, env_vars)
+        print("IN RUN --- RESULT\n", result)
         (label, mean) = self.parse_output(result)
         return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
 
     def parse_output(self, output):
         csv_file = io.StringIO(output)
+        print("RESULT\n", csv_file.read())
         reader = csv.reader(csv_file)
         next(reader, None)
         data_row = next(reader, None)
@@ -93,7 +93,8 @@ class ComputeUMFBenchmark(Benchmark):
 
     def teardown(self):
         return
-    
+
+# --benchmark_out_format=json --benchmark_out=./x    
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
         super().__init__(bench, "umf-benchmark")
@@ -101,5 +102,7 @@ class GBench(ComputeUMFBenchmark):
     def name(self):
         return self.bench_name
 
+    def bin_args(self):
+        return ["--benchmark_out_format=csv"]
 
     
