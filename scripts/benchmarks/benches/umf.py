@@ -108,4 +108,12 @@ class GBench(ComputeUMFBenchmark):
     # --benchmark_out=<file> and --benchmark_out_format=<format>
     # describe output to a file 
 
+    def unit(self):
+        return "ns"
+    # default unit
+    # might be changed globally with --benchmark_time_unit={ns|us|ms|s}
+    # the change affects only benchmark where time unit has not been set
+    # explicitly
+    
+
     
