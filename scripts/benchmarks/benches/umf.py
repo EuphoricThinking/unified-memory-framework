@@ -74,6 +74,7 @@ class ComputeUMFBenchmark(Benchmark):
         result = self.run_bench(command, env_vars)
         print("IN RUN --- RESULT\n", result)
         (label, mean) = self.parse_output(result)
+        print (label, mean)
         return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
 
     def parse_output(self, output):
