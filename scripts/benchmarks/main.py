@@ -30,7 +30,7 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         # ComputeBench(directory),
         # VelocityBench(directory),
         # SyclBench(directory)
-        #TestSuite()
+        # TestSuite()
     ] if not options.dry_run else []
 
     benchmarks = []
