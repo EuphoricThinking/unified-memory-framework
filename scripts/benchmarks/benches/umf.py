@@ -41,6 +41,15 @@ class ComputeUMFBenchmark(Benchmark):
     def __init__(self, bench, name):
         self.bench = bench
         self.bench_name = name
+
+        self.col_name = None
+        self.col_iterations = None
+        self.col_real_time = None
+        self.col_cpu_time = None
+        self.col_time_unit = None
+
+        self.col_statistics_time = None
+
         super().__init__(bench.directory)
 
     def bin_args(self) -> list[str]:
@@ -77,6 +86,7 @@ class ComputeUMFBenchmark(Benchmark):
         print (label, mean)
         return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
 
+    # if different time units - convert TODO safety check for time units
     def parse_output(self, output):
         csv_file = io.StringIO(output)
         # print("RESULT\n", csv_file.read())
@@ -88,6 +98,7 @@ class ComputeUMFBenchmark(Benchmark):
         try:
             label = data_row[0]
             mean = float(data_row[1])
+            print("label:", label, ", mean:", mean)
             return (label, mean)
         except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output: {e}")
@@ -98,6 +109,14 @@ class ComputeUMFBenchmark(Benchmark):
 # --benchmark_out_format=json --benchmark_out=./x    
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
+        self.col_name = 0
+        self.col_iter = 1
+        self.col_real_time = 2
+        self.col_cpu_time = 3
+        self.col_time_unit = 4
+
+        self.col_statistics_time = self.col_real_time
+
         super().__init__(bench, "umf-benchmark")
 
     def name(self):
