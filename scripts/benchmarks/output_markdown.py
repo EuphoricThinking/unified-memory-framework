@@ -59,8 +59,11 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
     # Collect all benchmarks and their results
     benchmark_results = collections.defaultdict(dict)
     for key, results in chart_data.items():
+        print("key: ", key, "\nresults:", results)
         for res in results:
             benchmark_results[res.name][key] = res
+            print(res.name, key, res)
+        print("\n")
 
     # Generate the table rows
     output_detailed_list = []
@@ -80,6 +83,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
 
         # Determine the best value
         for key, res in results.items():
+            print("resvalue", res.value)
             if best_value is None or (res.lower_is_better and res.value < best_value) or (not res.lower_is_better and res.value > best_value):
                 best_value = res.value
                 best_key = key
