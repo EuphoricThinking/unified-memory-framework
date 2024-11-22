@@ -102,6 +102,10 @@ class ComputeUMFBenchmark(Benchmark):
             return (label, mean)
         except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output: {e}")
+        
+    # Implementation with self.col_* indices could lead to the division by None
+    def get_mean(self, datarow):
+        raise NotImplementedError()
 
     def teardown(self):
         return
@@ -110,9 +114,9 @@ class ComputeUMFBenchmark(Benchmark):
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
         super().__init__(bench, "umf-benchmark")
-        
+
         self.col_name = 0
-        self.col_iter = 1
+        self.col_iterations = 1
         self.col_real_time = 2
         self.col_cpu_time = 3
         self.col_time_unit = 4
@@ -147,8 +151,13 @@ class GBench(ComputeUMFBenchmark):
             raise ValueError("Incorrect benchmark name format: ", full_name)
         
         return list_split[self.idx_pool], list_split[self.idx_config]
-        
 
+    def get_mean(self, datarow):
+        running_time = float(datarow[self.col_statistics_time])
+        iterations = float(datarow[self.col_iterations])
+        print("iterations:", iterations, ", running_time:", running_time)
+
+        return running_time / iterations
 
     def parse_output(self, output):
         csv_file = io.StringIO(output)
@@ -163,7 +172,7 @@ class GBench(ComputeUMFBenchmark):
             full_name = data_row[self.col_name]
             print("INSIDE", full_name)
             pool, config = self.get_pool_and_config(full_name)
-            mean = float(data_row[self.col_statistics_time])
+            mean = self.get_mean(data_row)
             print("label:", pool, ", statistics time:", mean)
             return (pool, mean)
         except (ValueError, IndexError) as e:
