@@ -80,6 +80,8 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
                     print(f"did not finish (OK for sycl-bench).")
                     break
 
+            print("\nIteration results:\n", iteration_results)
+            print("iteration count:", options.iterations, "iteration results len:", len(iteration_results))
             if len(iteration_results) == 0:
                 continue
 
