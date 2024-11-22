@@ -109,15 +109,19 @@ class ComputeUMFBenchmark(Benchmark):
 # --benchmark_out_format=json --benchmark_out=./x    
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
+        super().__init__(bench, "umf-benchmark")
+        
         self.col_name = 0
         self.col_iter = 1
         self.col_real_time = 2
         self.col_cpu_time = 3
         self.col_time_unit = 4
 
-        self.col_statistics_time = self.col_real_time
+        self.idx_pool = 0
+        self.idx_config = 1
+        self.name_separator = '/'
 
-        super().__init__(bench, "umf-benchmark")
+        self.col_statistics_time = self.col_real_time
 
     def name(self):
         return self.bench_name
@@ -134,6 +138,36 @@ class GBench(ComputeUMFBenchmark):
     # might be changed globally with --benchmark_time_unit={ns|us|ms|s}
     # the change affects only benchmark where time unit has not been set
     # explicitly
+
+    def get_pool_and_config(self, full_name):
+        print("full name", full_name)
+        list_split = full_name.split(self.name_separator, 1)
+        print("list split", list_split)
+        if len(list_split) != 2:
+            raise ValueError("Incorrect benchmark name format: ", full_name)
+        
+        return list_split[self.idx_pool], list_split[self.idx_config]
+        
+
+
+    def parse_output(self, output):
+        csv_file = io.StringIO(output)
+        # print("RESULT\n", csv_file.read())
+        reader = csv.reader(csv_file)
+        next(reader, None)
+        data_row = next(reader, None)
+        if data_row is None:
+            raise ValueError("Benchmark output does not contain data.")
+        try:
+            print("HEEEEREEEEEE", data_row)
+            full_name = data_row[self.col_name]
+            print("INSIDE", full_name)
+            pool, config = self.get_pool_and_config(full_name)
+            mean = float(data_row[self.col_statistics_time])
+            print("label:", pool, ", statistics time:", mean)
+            return (pool, mean)
+        except (ValueError, IndexError) as e:
+            raise ValueError(f"Error parsing output: {e}")
     
 
     
