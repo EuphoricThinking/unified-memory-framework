@@ -105,6 +105,8 @@ class ComputeUMFBenchmark(Benchmark):
         except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output: {e}")
         
+        
+        
     # Implementation with self.col_* indices could lead to the division by None
     def get_mean(self, datarow):
         raise NotImplementedError()
@@ -162,23 +164,68 @@ class GBench(ComputeUMFBenchmark):
         return running_time / iterations
 
     def parse_output(self, output):
+        # csv_file = io.StringIO(output)
+        # # print("RESULT\n", csv_file.read())
+        # reader = csv.reader(csv_file)
+        # next(reader, None)
+        # data_row = next(reader, None)
+        # if data_row is None:
+        #     raise ValueError("Benchmark output does not contain data.")
+        # try:
+        #     print("HEEEEREEEEEE", data_row)
+        #     full_name = data_row[self.col_name]
+        #     print("INSIDE", full_name)
+        #     pool, config = self.get_pool_and_config(full_name)
+        #     mean = self.get_mean(data_row)
+        #     print("label:", pool, ", statistics time:", mean)
+        #     return (pool, mean)
+        # except (ValueError, IndexError) as e:
+        #     raise ValueError(f"Error parsing output: {e}")
+        
         csv_file = io.StringIO(output)
-        # print("RESULT\n", csv_file.read())
+        # reader = csv.DictReader(csv_file)
         reader = csv.reader(csv_file)
-        next(reader, None)
+
         data_row = next(reader, None)
         if data_row is None:
             raise ValueError("Benchmark output does not contain data.")
-        try:
-            print("HEEEEREEEEEE", data_row)
-            full_name = data_row[self.col_name]
-            print("INSIDE", full_name)
-            pool, config = self.get_pool_and_config(full_name)
-            mean = self.get_mean(data_row)
-            print("label:", pool, ", statistics time:", mean)
-            return (pool, mean)
-        except (ValueError, IndexError) as e:
-            raise ValueError(f"Error parsing output: {e}")
+
+        results = []
+        for row in reader:
+            print(row)
+            try:
+                full_name = row[self.col_name]
+                print("INSIDE", full_name)
+                pool, config = self.get_pool_and_config(full_name)
+                mean = self.get_mean(row)
+                results.append((pool, mean))
+            except KeyError as e:
+                raise ValueError(f"Error parsing output: {e}")
+
+        return results
     
+    def run(self, env_vars) -> list[Result]:
+        print("runme")
+        command = [
+            f"{self.benchmark_bin}",
+        #     f"--test={self.test}",
+        #     "--csv",
+        #     "--noHeaders"
+        ]
+
+        print("benchmark path", self.benchmark_bin)
+        command += self.bin_args()
+        env_vars.update(self.extra_env_vars())
+
+        print('run bench')
+        result = self.run_bench(command, env_vars)
+        print("IN RUN --- RESULT\n", result)
+        parsed = self.parse_output(result)
+        results = []
+        for r in parsed:
+            (extra_label, mean) = r
+            label = f"{self.name()} {extra_label}"
+            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
+        return results
 
     
