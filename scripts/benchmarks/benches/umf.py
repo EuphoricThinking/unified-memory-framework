@@ -69,6 +69,7 @@ class ComputeUMFBenchmark(Benchmark):
         self.benchmark_bin = os.path.join(options.umf, 'benchmark', self.bench_name)
 
     def run(self, env_vars) -> list[Result]:
+        print("runme")
         command = [
             f"{self.benchmark_bin}",
         #     f"--test={self.test}",
@@ -80,6 +81,7 @@ class ComputeUMFBenchmark(Benchmark):
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
+        print('run bench')
         result = self.run_bench(command, env_vars)
         print("IN RUN --- RESULT\n", result)
         (label, mean) = self.parse_output(result)
