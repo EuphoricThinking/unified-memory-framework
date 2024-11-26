@@ -92,6 +92,7 @@ def create_bar_plot(ax: plt.Axes,
                    latest_results: dict[str, LatestResults],
                    benchmarks: list[BenchmarkSeries],
                    baseline_name: str) -> float:
+    print("group:", group_benchmarks)
     x = np.arange(len(group_benchmarks))
     width = 0.8 / len(non_baseline_runs)
     max_height = 0
@@ -191,6 +192,7 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
     )))
 
     if baseline_name not in run_names:
+        print("baseline not in names")
         return []
 
     benchmark_labels = [b.label for b in benchmarks]
@@ -200,6 +202,7 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
     html_charts = []
 
     for group_name, group_benchmarks in benchmark_groups.items():
+        print("group name:", group_name, "| group benchmark:", group_benchmarks, "\n")
         plt.close('all')
         non_baseline_runs = [n for n in run_names if n != baseline_name]
 
@@ -240,6 +243,7 @@ def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str
         ax = axes[idx]
 
         for run in benchmark.runs:
+            # print("IDX ", idx, ", RUN: ", run, "\n")
             sorted_points = sorted(run.results, key=lambda x: x.date)
             dates = [point.date for point in sorted_points]
             values = [point.value for point in sorted_points]
@@ -290,11 +294,16 @@ def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: li
     run_map: dict[str, dict[str, list[Result]]] = defaultdict(lambda: defaultdict(list))
 
     for run in benchmark_runs:
+        print("RUN", run.name)
         if run.name not in compare_names:
+            print("not comparing:", run.name)
             continue
+        print("comparing:", run.name)
 
         for result in run.results:
+            print("result label:", result.label)
             if result.label not in benchmark_metadata:
+                print("not in metadata", result.label)
                 benchmark_metadata[result.label] = BenchmarkMetadata(
                     unit=result.unit,
                     lower_is_better=result.lower_is_better
@@ -319,6 +328,9 @@ def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: li
     return benchmark_series
 
 def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_names: list[str]) -> str:
+    # for idx, b in enumerate(benchmark_runs):
+    #     print(idx, b, '\n')
+    # print("end of runs\n\n")
     baseline_name = compare_names[0]
     benchmarks = process_benchmark_data(benchmark_runs, compare_names)
 
