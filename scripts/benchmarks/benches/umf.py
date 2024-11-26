@@ -69,7 +69,7 @@ class ComputeUMFBenchmark(Benchmark):
         self.benchmark_bin = os.path.join(options.umf, 'benchmark', self.bench_name)
 
     def run(self, env_vars) -> list[Result]:
-        print("runme")
+        # print("runme")
         command = [
             f"{self.benchmark_bin}",
         #     f"--test={self.test}",
@@ -77,13 +77,13 @@ class ComputeUMFBenchmark(Benchmark):
         #     "--noHeaders"
         ]
 
-        print("benchmark path", self.benchmark_bin)
+        # print("benchmark path", self.benchmark_bin)
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
-        print('run bench')
+        # print('run bench')
         result = self.run_bench(command, env_vars)
-        print("IN RUN --- RESULT\n", result)
+        # print("IN RUN --- RESULT\n", result)
         (label, mean) = self.parse_output(result)
         print (label, mean)
         return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
@@ -100,7 +100,7 @@ class ComputeUMFBenchmark(Benchmark):
         try:
             label = data_row[0]
             mean = float(data_row[1])
-            print("label:", label, ", mean:", mean)
+            # print("label:", label, ", mean:", mean)
             return (label, mean)
         except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output: {e}")
@@ -132,6 +132,7 @@ class GBench(ComputeUMFBenchmark):
         self.col_statistics_time = self.col_real_time
 
     def name(self):
+        print("bench name:", self.bench_name)
         return self.bench_name
 
     def bin_args(self):
@@ -148,9 +149,9 @@ class GBench(ComputeUMFBenchmark):
     # explicitly
 
     def get_pool_and_config(self, full_name):
-        print("full name", full_name)
+        # print("full name", full_name)
         list_split = full_name.split(self.name_separator, 1)
-        print("list split", list_split)
+        # print("list split", list_split)
         if len(list_split) != 2:
             raise ValueError("Incorrect benchmark name format: ", full_name)
         
@@ -159,7 +160,7 @@ class GBench(ComputeUMFBenchmark):
     def get_mean(self, datarow):
         running_time = float(datarow[self.col_statistics_time])
         iterations = float(datarow[self.col_iterations])
-        print("iterations:", iterations, ", running_time:", running_time)
+        # print("iterations:", iterations, ", running_time:", running_time)
 
         return running_time / iterations
 
@@ -198,14 +199,16 @@ class GBench(ComputeUMFBenchmark):
                 print("INSIDE", full_name)
                 pool, config = self.get_pool_and_config(full_name)
                 mean = self.get_mean(row)
-                results.append((pool, mean))
+                # results.append((pool, mean))
+                # results.append((full_name, mean))
+                results.append((config, pool, mean))
             except KeyError as e:
                 raise ValueError(f"Error parsing output: {e}")
 
         return results
     
     def run(self, env_vars) -> list[Result]:
-        print("runme")
+        # print("runme")
         command = [
             f"{self.benchmark_bin}",
         #     f"--test={self.test}",
@@ -213,18 +216,21 @@ class GBench(ComputeUMFBenchmark):
         #     "--noHeaders"
         ]
 
-        print("benchmark path", self.benchmark_bin)
+        # print("benchmark path", self.benchmark_bin)
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
-        print('run bench')
+        # print('run bench')
         result = self.run_bench(command, env_vars)
-        print("IN RUN --- RESULT\n", result)
+        # print("IN RUN --- RESULT\n", result)
         parsed = self.parse_output(result)
         results = []
         for r in parsed:
-            (extra_label, mean) = r
-            label = f"{self.name()} {extra_label}"
+            # (extra_label, mean) = r
+            (config, pool, mean) = r
+            # label = f"{self.name()} {extra_label}"
+            label = f"{config} {pool}"
+            print("INSIDE UMF label", label, "| self.name:", self.name(), "| config:", config, "| pool:", pool)
             results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
         return results
 
