@@ -8,9 +8,9 @@
 from benches.compute import *
 from benches.velocity import VelocityBench
 from benches.syclbench import *
+from benches.llamacpp import *
 from benches.test import TestSuite
 from benches.options import Compare, options
-from benches.umf import UMFSuite
 from output_markdown import generate_markdown
 from output_html import generate_html
 from history import BenchmarkHistory
@@ -26,11 +26,11 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     prepare_workdir(directory, INTERNAL_WORKDIR_VERSION)
 
     suites = [
-        UMFSuite(directory),
-        # ComputeBench(directory),
-        # VelocityBench(directory),
-        # SyclBench(directory)
-        # TestSuite()
+        ComputeBench(directory),
+        VelocityBench(directory),
+        SyclBench(directory),
+        LlamaCppBench(directory),
+        #TestSuite()
     ] if not options.dry_run else []
 
     benchmarks = []
@@ -66,7 +66,8 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         try:
             merged_env_vars = {**additional_env_vars}
             iteration_results = []
-            for iter in range(options.iterations):
+            iterations = options.iterations if not benchmark.ignore_iterations() else 1
+            for iter in range(iterations):
                 print(f"running {benchmark.name()}, iteration {iter}... ", end='', flush=True)
                 bench_results = benchmark.run(merged_env_vars)
                 if bench_results is not None:
@@ -80,8 +81,6 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
                     print(f"did not finish (OK for sycl-bench).")
                     break
 
-            print("\nIteration results:\n", iteration_results)
-            print("iteration count:", options.iterations, "iteration results len:", len(iteration_results))
             if len(iteration_results) == 0:
                 continue
 
@@ -118,7 +117,6 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     history.load(1000)
 
     for name in compare_names:
-        print(f"compare name: {name}")
         compare_result = history.get_compare(name)
         if compare_result:
             chart_data[name] = compare_result.results
@@ -129,6 +127,8 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         with open('benchmark_results.md', 'w') as file:
             file.write(markdown_content)
 
+        print(f"Markdown with benchmark results has been written to {os.getcwd()}/benchmark_results.md")
+
     saved_name = save_name if save_name is not None else this_name
 
     # It's important we don't save the current results into history before
@@ -136,7 +136,6 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     # Otherwise we might be comparing the results to themselves.
     if not options.dry_run:
         history.save(saved_name, results, save_name is not None)
-        print(f"Markdown with benchmark results has been written to {os.getcwd()}/benchmark_results.md")
         compare_names.append(saved_name)
 
     if options.output_html:
@@ -145,7 +144,7 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         with open('benchmark_results.html', 'w') as file:
             file.write(html_content)
 
-    print(f"HTML with benchmark results has been written to {os.getcwd()}/benchmark_results.html")
+        print(f"HTML with benchmark results has been written to {os.getcwd()}/benchmark_results.html")
 
 def validate_and_parse_env_args(env_args):
     env_vars = {}
@@ -161,7 +160,6 @@ if __name__ == "__main__":
     parser.add_argument('benchmark_directory', type=str, help='Working directory to setup benchmarks.')
     parser.add_argument('--sycl', type=str, help='Root directory of the SYCL compiler.', default=None)
     parser.add_argument('--ur', type=str, help='UR install prefix path', default=None)
-    parser.add_argument('--umf', type=str, help='UMF install prefix path')
     parser.add_argument('--adapter', type=str, help='Options to build the Unified Runtime as part of the benchmark', default="level_zero")
     parser.add_argument("--no-rebuild", help='Rebuild the benchmarks from scratch.', action="store_true")
     parser.add_argument("--env", type=str, help='Use env variable for a benchmark run.', action="append", default=[])
@@ -189,7 +187,6 @@ if __name__ == "__main__":
     options.timeout = args.timeout
     options.epsilon = args.epsilon
     options.ur = args.ur
-    options.umf = args.umf
     options.ur_adapter = args.adapter
     options.exit_on_failure = args.exit_on_failure
     options.compare = Compare(args.compare_type)
