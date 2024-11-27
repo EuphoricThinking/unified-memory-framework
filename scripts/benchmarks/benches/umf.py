@@ -20,7 +20,7 @@ class UMFSuite(Suite):
     def __init__(self, directory):
         self.directory = directory
         if not isUMFAvailable():
-            print("UMF install prefix path not provided SUITE")
+            print("UMF install prefix path not provided")
     
     def setup(self):
         if not isUMFAvailable():
@@ -63,35 +63,26 @@ class ComputeUMFBenchmark(Benchmark):
 
     def setup(self):
         if not isUMFAvailable():
-            print("UMF prefix path not provided BENCHMARK", options.umf)
+            print("UMF prefix path not provided")
             return
 
         self.benchmark_bin = os.path.join(options.umf, 'benchmark', self.bench_name)
 
     def run(self, env_vars) -> list[Result]:
-        # print("runme")
         command = [
             f"{self.benchmark_bin}",
-        #     f"--test={self.test}",
-        #     "--csv",
-        #     "--noHeaders"
         ]
 
-        # print("benchmark path", self.benchmark_bin)
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
-        # print('run bench')
         result = self.run_bench(command, env_vars)
-        # print("IN RUN --- RESULT\n", result)
         (label, mean) = self.parse_output(result)
-        print (label, mean)
         return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
 
     # if different time units - convert TODO safety check for time units
     def parse_output(self, output):
         csv_file = io.StringIO(output)
-        # print("RESULT\n", csv_file.read())
         reader = csv.reader(csv_file)
         next(reader, None)
         data_row = next(reader, None)
@@ -100,7 +91,6 @@ class ComputeUMFBenchmark(Benchmark):
         try:
             label = data_row[0]
             mean = float(data_row[1])
-            # print("label:", label, ", mean:", mean)
             return (label, mean)
         except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output: {e}")
@@ -114,7 +104,6 @@ class ComputeUMFBenchmark(Benchmark):
     def teardown(self):
         return
 
-# --benchmark_out_format=json --benchmark_out=./x    
 class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
         super().__init__(bench, "umf-benchmark")
@@ -132,26 +121,23 @@ class GBench(ComputeUMFBenchmark):
         self.col_statistics_time = self.col_real_time
 
     def name(self):
-        print("bench name:", self.bench_name)
         return self.bench_name
 
-    def bin_args(self):
-        return ["--benchmark_format=csv"]
     # --benchmark_format describes stdout output
     # --benchmark_out=<file> and --benchmark_out_format=<format>
     # describe output to a file 
+    def bin_args(self):
+        return ["--benchmark_format=csv"]
 
-    def unit(self):
-        return "ns"
-    # default unit
+    # the default unit
     # might be changed globally with --benchmark_time_unit={ns|us|ms|s}
     # the change affects only benchmark where time unit has not been set
     # explicitly
+    def unit(self):
+        return "ns"
 
     def get_pool_and_config(self, full_name):
-        # print("full name", full_name)
         list_split = full_name.split(self.name_separator, 1)
-        # print("list split", list_split)
         if len(list_split) != 2:
             raise ValueError("Incorrect benchmark name format: ", full_name)
         
@@ -160,31 +146,11 @@ class GBench(ComputeUMFBenchmark):
     def get_mean(self, datarow):
         running_time = float(datarow[self.col_statistics_time])
         iterations = float(datarow[self.col_iterations])
-        # print("iterations:", iterations, ", running_time:", running_time)
 
         return running_time / iterations
 
-    def parse_output(self, output):
-        # csv_file = io.StringIO(output)
-        # # print("RESULT\n", csv_file.read())
-        # reader = csv.reader(csv_file)
-        # next(reader, None)
-        # data_row = next(reader, None)
-        # if data_row is None:
-        #     raise ValueError("Benchmark output does not contain data.")
-        # try:
-        #     print("HEEEEREEEEEE", data_row)
-        #     full_name = data_row[self.col_name]
-        #     print("INSIDE", full_name)
-        #     pool, config = self.get_pool_and_config(full_name)
-        #     mean = self.get_mean(data_row)
-        #     print("label:", pool, ", statistics time:", mean)
-        #     return (pool, mean)
-        # except (ValueError, IndexError) as e:
-        #     raise ValueError(f"Error parsing output: {e}")
-        
+    def parse_output(self, output):        
         csv_file = io.StringIO(output)
-        # reader = csv.DictReader(csv_file)
         reader = csv.reader(csv_file)
 
         data_row = next(reader, None)
@@ -193,14 +159,10 @@ class GBench(ComputeUMFBenchmark):
 
         results = []
         for row in reader:
-            print(row)
             try:
                 full_name = row[self.col_name]
-                print("INSIDE", full_name)
                 pool, config = self.get_pool_and_config(full_name)
                 mean = self.get_mean(row)
-                # results.append((pool, mean))
-                # results.append((full_name, mean))
                 results.append((config, pool, mean))
             except KeyError as e:
                 raise ValueError(f"Error parsing output: {e}")
@@ -208,29 +170,19 @@ class GBench(ComputeUMFBenchmark):
         return results
     
     def run(self, env_vars) -> list[Result]:
-        # print("runme")
         command = [
             f"{self.benchmark_bin}",
-        #     f"--test={self.test}",
-        #     "--csv",
-        #     "--noHeaders"
         ]
 
-        # print("benchmark path", self.benchmark_bin)
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
-        # print('run bench')
         result = self.run_bench(command, env_vars)
-        # print("IN RUN --- RESULT\n", result)
         parsed = self.parse_output(result)
         results = []
         for r in parsed:
-            # (extra_label, mean) = r
             (config, pool, mean) = r
-            # label = f"{self.name()} {extra_label}"
             label = f"{config} {pool}"
-            print("INSIDE UMF label", label, "| self.name:", self.name(), "| config:", config, "| pool:", pool)
             results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
         return results
 
