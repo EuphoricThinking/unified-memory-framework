@@ -167,6 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-rebuild", help='Rebuild the benchmarks from scratch.', action="store_true")
     parser.add_argument("--env", type=str, help='Use env variable for a benchmark run.', action="append", default=[])
     parser.add_argument("--save", type=str, help='Save the results for comparison under a specified name.')
+    # Needed for comparison between benchmarks in the same parameter configuration
     parser.add_argument("--compare", type=str, help='Compare results against previously saved data.', action="append", default=["baseline"])
     parser.add_argument("--iterations", type=int, help='Number of times to run each benchmark to select a median value.', default=5)
     parser.add_argument("--timeout", type=int, help='Timeout for individual benchmarks in seconds.', default=600)
