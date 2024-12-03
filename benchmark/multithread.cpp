@@ -139,11 +139,5 @@ int main() {
     // ctest looks for "PASSED" in the output
     std::cout << "PASSED" << std::endl;
 
-    ret = umfDisjointPoolParamsDestroy(hDisjointParams);
-    if (ret != UMF_RESULT_SUCCESS) {
-        std::cerr << "disjoint pool params destroy failed" << std::endl;
-        return -1;
-    }
-
     return 0;
 }

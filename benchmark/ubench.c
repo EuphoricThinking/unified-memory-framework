@@ -481,7 +481,10 @@ int create_level_zero_params(ze_context_handle_t *context,
 UBENCH_EX(ipc, disjoint_pool_with_level_zero_provider) {
     const size_t BUFFER_SIZE = 100;
     const size_t N_BUFFERS = 1000;
-    level_zero_memory_provider_params_t level_zero_params = {0};
+    umf_result_t umf_result;
+    ze_context_handle_t context = NULL;
+    ze_device_handle_t device = NULL;
+    umf_level_zero_memory_provider_params_handle_t level_zero_params = NULL;
 
     int ret = create_level_zero_params(&context, &device);
     if (ret != 0) {

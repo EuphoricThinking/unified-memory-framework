@@ -6,8 +6,7 @@ include(FetchContent)
 FetchContent_Declare(
     googlebenchmark
     GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG v1.9.0
-    EXCLUDE_FROM_ALL)
+    GIT_TAG v1.9.0)
 
 set(BENCHMARK_ENABLE_GTEST_TESTS
     OFF
@@ -73,7 +72,17 @@ function(add_umf_benchmark)
         COMMAND ${BENCH_NAME}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-    set_tests_properties(${BENCH_NAME} PROPERTIES LABELS "benchmark")
+    if("${BENCH_NAME}" STREQUAL "umf-ubench")
+        # Benchmark passes if it prints "PASSED" in the output, because ubench
+        # of scalable pool fails if the confidence interval exceeds maximum
+        # permitted 2.5%.
+        set_tests_properties(
+            ${BENCH_NAME} PROPERTIES
+            LABELS "benchmark"
+            PASS_REGULAR_EXPRESSION "PASSED")
+    else()
+        set_tests_properties(${BENCH_NAME} PROPERTIES LABELS "benchmark")
+    endif()
 
     if(WINDOWS)
         # append PATH to DLLs

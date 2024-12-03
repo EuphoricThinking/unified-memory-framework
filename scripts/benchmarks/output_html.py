@@ -69,6 +69,7 @@ def prepare_normalized_data(latest_results: dict[str, LatestResults],
 
 def format_benchmark_label(label: str) -> list[str]:
     words = re.split(' |_', label)
+    print("WORDS", words, "\n")
     lines = []
     current_line = []
 
@@ -180,6 +181,7 @@ def group_benchmark_labels(benchmark_labels):
     for label in benchmark_labels:
         group = re.match(r'^[^_\s]+', label)[0]
         benchmark_groups[group].append(label)
+    print("benchmark groups:", benchmark_groups, "\n")
     return split_large_groups(benchmark_groups)
 
 def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name: str) -> list[str]:
@@ -201,6 +203,7 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
 
     for group_name, group_benchmarks in benchmark_groups.items():
         plt.close('all')
+        print("group name:", group_name, " | group benchmarks:", group_benchmarks, "\n")
         non_baseline_runs = [n for n in run_names if n != baseline_name]
 
         if len(non_baseline_runs) == 0:
