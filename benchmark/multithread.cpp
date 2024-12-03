@@ -139,6 +139,7 @@ int main() {
     // ctest looks for "PASSED" in the output
     std::cout << "PASSED" << std::endl;
 
+<<<<<<< HEAD
 #if defined(UMF_POOL_DISJOINT_ENABLED)
     ret = umfDisjointPoolParamsDestroy(hDisjointParams);
     if (ret != UMF_RESULT_SUCCESS) {
@@ -147,5 +148,7 @@ int main() {
     }
 #endif
 
+=======
+>>>>>>> 002b3cbe (Debugging labels)
     return 0;
 }

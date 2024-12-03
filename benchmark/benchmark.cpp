@@ -22,114 +22,333 @@
 
 #include "benchmark.hpp"
 
-struct os_provider : public provider_interface {
-    umf_os_memory_provider_params_t params = umfOsMemoryProviderParamsDefault();
-    virtual void *getParams() override { return &params; }
-    virtual umf_memory_provider_ops_t *getOps() override {
-        return umfOsMemoryProviderOps();
+struct glibc_malloc : public allocator_interface {
+    unsigned SetUp([[maybe_unused]] ::benchmark::State &state,
+                   unsigned argPos) override {
+        return argPos;
     }
+    void TearDown([[maybe_unused]] ::benchmark::State &state) override{};
+    void *benchAlloc(size_t size) override { return malloc(size); }
+    void benchFree(void *ptr, [[maybe_unused]] size_t size) override {
+        free(ptr);
+    }
+    static std::string name() { return "glibc"; }
 };
 
-template <typename T> class proxy_pool : public pool_interface<T> {
-  private:
-    virtual umf_memory_pool_ops_t *
+struct os_provider : public provider_interface {
+    umf_os_memory_provider_params_handle_t params = NULL;
+    os_provider() {
+        umfOsMemoryProviderParamsCreate(&params);
+        return;
+    }
+
+    ~os_provider() {
+        if (params != NULL) {
+            umfOsMemoryProviderParamsDestroy(params);
+        }
+    }
+
+    void *getParams() override { return params; }
+    umf_memory_provider_ops_t *getOps() override {
+        return umfOsMemoryProviderOps();
+    }
+    static std::string name() { return "os_provider"; }
+};
+
+template <typename Provider>
+struct proxy_pool : public pool_interface<Provider> {
+    umf_memory_pool_ops_t *
     getOps([[maybe_unused]] ::benchmark::State &state) override {
         return umfProxyPoolOps();
     }
-    virtual void *
-    getParams([[maybe_unused]] ::benchmark::State &state) override {
+    void *getParams([[maybe_unused]] ::benchmark::State &state) override {
         return nullptr;
     }
+    static std::string name() { return "proxy_pool<" + Provider::name() + ">"; }
 };
 
 #ifdef UMF_BUILD_LIBUMF_POOL_DISJOINT
-template <typename T> class disjoint_pool : public pool_interface<T> {
-    umf_disjoint_pool_params_t disjoint_memory_pool_params;
-    virtual umf_memory_pool_ops_t *
+template <typename Provider>
+struct disjoint_pool : public pool_interface<Provider> {
+    umf_disjoint_pool_params_handle_t disjoint_memory_pool_params;
+
+    disjoint_pool() {
+        disjoint_memory_pool_params = NULL;
+        auto ret = umfDisjointPoolParamsCreate(&disjoint_memory_pool_params);
+        if (ret != UMF_RESULT_SUCCESS) {
+            return;
+        }
+
+        // those function should never fail, so error handling is minimal.
+        ret = umfDisjointPoolParamsSetSlabMinSize(disjoint_memory_pool_params,
+                                                  4096);
+        if (ret != UMF_RESULT_SUCCESS) {
+            goto err;
+        }
+
+        ret = umfDisjointPoolParamsSetCapacity(disjoint_memory_pool_params, 4);
+        if (ret != UMF_RESULT_SUCCESS) {
+            goto err;
+        }
+
+        ret = umfDisjointPoolParamsSetMinBucketSize(disjoint_memory_pool_params,
+                                                    4096);
+        if (ret != UMF_RESULT_SUCCESS) {
+            goto err;
+        }
+
+        ret = umfDisjointPoolParamsSetMaxPoolableSize(
+            disjoint_memory_pool_params, 4096 * 16);
+
+        if (ret != UMF_RESULT_SUCCESS) {
+            goto err;
+        }
+        return;
+    err:
+
+        umfDisjointPoolParamsDestroy(disjoint_memory_pool_params);
+        disjoint_memory_pool_params = NULL;
+    }
+
+    ~disjoint_pool() {
+        if (disjoint_memory_pool_params != NULL) {
+            umfDisjointPoolParamsDestroy(disjoint_memory_pool_params);
+        }
+    }
+
+    umf_memory_pool_ops_t *
     getOps([[maybe_unused]] ::benchmark::State &state) override {
         return umfDisjointPoolOps();
     }
-    virtual void *
-    getParams([[maybe_unused]] ::benchmark::State &state) override {
-        size_t page_size;
-        if (umfMemoryProviderGetMinPageSize(
-                pool_interface<T>::provider.provider, NULL, &page_size) !=
-            UMF_RESULT_SUCCESS) {
-            return NULL;
-        }
-        disjoint_memory_pool_params.SlabMinSize = page_size;
-        disjoint_memory_pool_params.MaxPoolableSize = page_size * 2;
-        disjoint_memory_pool_params.Capacity = state.range(0);
+    void *getParams([[maybe_unused]] ::benchmark::State &state) override {
 
-        disjoint_memory_pool_params.MinBucketSize = page_size;
-        return &disjoint_memory_pool_params;
+        if (disjoint_memory_pool_params == NULL) {
+            state.SkipWithError("Failed to create disjoint pool params");
+        }
+
+        return disjoint_memory_pool_params;
+    }
+    static std::string name() {
+        return "disjoint_pool<" + Provider::name() + ">";
     }
 };
 #endif
 
 #ifdef UMF_BUILD_LIBUMF_POOL_JEMALLOC
-template <typename T> class jemalloc_pool : public pool_interface<T> {
-  private:
-    virtual umf_memory_pool_ops_t *
-    getOps([[maybe_unused]] ::benchmark::State &state) {
+template <typename Provider>
+struct jemalloc_pool : public pool_interface<Provider> {
+    umf_memory_pool_ops_t *
+    getOps([[maybe_unused]] ::benchmark::State &state) override {
         return umfJemallocPoolOps();
     }
-    virtual void *getParams([[maybe_unused]] ::benchmark::State &state) {
+    void *getParams([[maybe_unused]] ::benchmark::State &state) override {
         return NULL;
+    }
+    static std::string name() {
+        return "jemalloc_pool<" + Provider::name() + ">";
     }
 };
 #endif
 
-template <typename T> class scalable_pool : public pool_interface<T> {
-  private:
+template <typename Provider>
+struct scalable_pool : public pool_interface<Provider> {
     virtual umf_memory_pool_ops_t *
-    getOps([[maybe_unused]] ::benchmark::State &state) {
+    getOps([[maybe_unused]] ::benchmark::State &state) override {
         return umfScalablePoolOps();
     }
-    virtual void *getParams([[maybe_unused]] ::benchmark::State &state) {
+    virtual void *
+    getParams([[maybe_unused]] ::benchmark::State &state) override {
         return NULL;
+    }
+    static std::string name() {
+        return "scalable_pool<" + Provider::name() + ">";
     }
 };
 
 // Benchmarks scenarios:
 
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, stdmalloc, fix_alloc_size);
-BENCHMARK_REGISTER_F(alloc_benchmark, stdmalloc)->Args({1000, 4096});
-BENCHMARK_REGISTER_F(alloc_benchmark, stdmalloc)->Args({1000, 10 * 4096});
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, glibc_fix, fixed_alloc_size,
+                              glibc_malloc);
 
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(provider_benchmark, bench, os_provider,
-                                fix_alloc_size);
-BENCHMARK_REGISTER_F(provider_benchmark, bench)
-    ->Args({1000, 4096})
-    ->Args({1000, 100 * 4096});
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, glibc_fix)
+    ->Args({10000, 0, 4096})
+    ->Args({10000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
 
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(pool_benchmark, bench, proxy_pool<os_provider>,
-                                fix_alloc_size);
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, glibc_uniform,
+                              uniform_alloc_size, glibc_malloc);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, glibc_uniform)
+    ->Args({10000, 0, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
 
-BENCHMARK_REGISTER_F(pool_benchmark, bench)->Args({1000, 4096});
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, os_provider, fixed_alloc_size,
+                              provider_allocator<os_provider>);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, os_provider)
+    ->Args({10000, 0, 4096})
+    ->Args({10000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, proxy_pool, fixed_alloc_size,
+                              pool_allocator<proxy_pool<os_provider>>);
+
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, proxy_pool)
+    ->Args({1000, 0, 4096})
+    ->Args({1000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
 
 #ifdef UMF_BUILD_LIBUMF_POOL_DISJOINT
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(pool_benchmark, disjoint_pool,
-                                disjoint_pool<os_provider>, fix_alloc_size);
-BENCHMARK_REGISTER_F(pool_benchmark, disjoint_pool)->Args({1000, 4096});
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, disjoint_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<disjoint_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, disjoint_pool_fix)
+    ->Args({10000, 0, 4096})
+    ->Args({10000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+// TODO: debug why this crashes
+/*UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, disjoint_pool_uniform,
+                              uniform_alloc_size,
+                              pool_allocator<disjoint_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, disjoint_pool_uniform)
+    ->Args({10000, 0, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);*/
+
 #endif
 
 #ifdef UMF_BUILD_LIBUMF_POOL_JEMALLOC
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(pool_benchmark, jemalloc_pool,
-                                jemalloc_pool<os_provider>, fix_alloc_size);
-BENCHMARK_REGISTER_F(pool_benchmark, jemalloc_pool)->Args({1000, 4096});
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, jemalloc_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<jemalloc_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, jemalloc_pool_fix)
+    ->Args({10000, 0, 4096})
+    ->Args({10000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
 
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(pool_benchmark, jemalloc_pool_size,
-                                jemalloc_pool<os_provider>, uniform_alloc_size);
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, jemalloc_pool_uniform,
+                              uniform_alloc_size,
+                              pool_allocator<jemalloc_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, jemalloc_pool_uniform)
+    ->Args({10000, 0, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
 
-BENCHMARK_REGISTER_F(pool_benchmark, jemalloc_pool_size)
-    ->Args({1000, 1, 5, 4096});
 #endif
 
-ALLOC_BENCHMARK_TEMPLATE_DEFINE(pool_benchmark, scalable_pool_size,
-                                scalable_pool<os_provider>, uniform_alloc_size);
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, scalable_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<scalable_pool<os_provider>>);
 
-BENCHMARK_REGISTER_F(pool_benchmark, scalable_pool_size)
-    ->Args({1000, 1, 5, 4096});
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, scalable_pool_fix)
+    ->Args({10000, 0, 4096})
+    ->Args({10000, 100000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(alloc_benchmark, scalable_pool_uniform,
+                              uniform_alloc_size,
+                              pool_allocator<scalable_pool<os_provider>>);
+
+UMF_BENCHMARK_REGISTER_F(alloc_benchmark, scalable_pool_uniform)
+    ->Args({10000, 0, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
+
+// Multiple allocs/free
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, glibc_fix,
+                              fixed_alloc_size, glibc_malloc);
+
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, glibc_fix)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, glibc_uniform,
+                              uniform_alloc_size, glibc_malloc);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, glibc_uniform)
+    ->Args({10000, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, proxy_pool,
+                              fixed_alloc_size,
+                              pool_allocator<proxy_pool<os_provider>>);
+
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, proxy_pool)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, os_provider,
+                              fixed_alloc_size,
+                              provider_allocator<os_provider>);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, os_provider)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+#ifdef UMF_BUILD_LIBUMF_POOL_DISJOINT
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, disjoint_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<disjoint_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, disjoint_pool_fix)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+// TODO: debug why this crashes
+/*UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark,
+                              disjoint_pool_uniform, uniform_alloc_size,
+                              pool_allocator<disjoint_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, disjoint_pool_uniform)
+    ->Args({10000, 0, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
+*/
+#endif
+
+#ifdef UMF_BUILD_LIBUMF_POOL_JEMALLOC
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, jemalloc_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<jemalloc_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, jemalloc_pool_fix)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark,
+                              jemalloc_pool_uniform, uniform_alloc_size,
+                              pool_allocator<jemalloc_pool<os_provider>>);
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, jemalloc_pool_uniform)
+    ->Args({1000, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
+
+#endif
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark, scalable_pool_fix,
+                              fixed_alloc_size,
+                              pool_allocator<scalable_pool<os_provider>>);
+
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, scalable_pool_fix)
+    ->Args({10000, 4096})
+    ->Threads(4)
+    ->Threads(1);
+
+UMF_BENCHMARK_TEMPLATE_DEFINE(multiple_malloc_free_benchmark,
+                              scalable_pool_uniform, uniform_alloc_size,
+                              pool_allocator<scalable_pool<os_provider>>);
+
+UMF_BENCHMARK_REGISTER_F(multiple_malloc_free_benchmark, scalable_pool_uniform)
+    ->Args({10000, 8, 64 * 1024, 8})
+    ->Threads(4)
+    ->Threads(1);
 
 BENCHMARK_MAIN();
