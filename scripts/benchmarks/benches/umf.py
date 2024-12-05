@@ -20,11 +20,11 @@ class UMFSuite(Suite):
     def __init__(self, directory):
         self.directory = directory
         if not isUMFAvailable():
-            print("UMF install prefix path not provided")
+            print("UMF not provided. Related benchmarks will not run")
     
     def setup(self):
         if not isUMFAvailable():
-            return
+            return []
         self.built = True
 
     def benchmarks(self) -> list[Benchmark]:
@@ -77,8 +77,14 @@ class ComputeUMFBenchmark(Benchmark):
         env_vars.update(self.extra_env_vars())
 
         result = self.run_bench(command, env_vars)
-        (label, mean) = self.parse_output(result)
-        return [ Result(label=self.name(), value=mean, command=command, env=env_vars, stdout=result) ]
+        parsed = self.parse_output(result)
+        results = []
+        for r in parsed:
+            (config, pool, mean) = r
+            label = f"{config}#{pool}"
+            print("label inside:", label, " || config: ", config,  " || pool: ", pool)
+            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
+        return results
 
     # if different time units - convert TODO safety check for time units
     def parse_output(self, output):
@@ -169,21 +175,5 @@ class GBench(ComputeUMFBenchmark):
 
         return results
     
-    def run(self, env_vars) -> list[Result]:
-        command = [
-            f"{self.benchmark_bin}",
-        ]
-
-        command += self.bin_args()
-        env_vars.update(self.extra_env_vars())
-
-        result = self.run_bench(command, env_vars)
-        parsed = self.parse_output(result)
-        results = []
-        for r in parsed:
-            (config, pool, mean) = r
-            label = f"{config} {pool}"
-            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
-        return results
 
     

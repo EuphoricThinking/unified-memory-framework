@@ -84,6 +84,8 @@ def format_benchmark_label(label: str) -> list[str]:
     if current_line:
         lines.append(' '.join(current_line))
 
+    print("LINES: ", lines)
+
     return lines
 
 def create_bar_plot(ax: plt.Axes,
@@ -141,6 +143,7 @@ def add_chart_elements(ax: plt.Axes,
     ax.set_xticks([])
 
     for idx, label in enumerate(group_benchmarks):
+        print("label in group add_chart_elems", label)
         split_labels = format_benchmark_label(label)
         for i, sublabel in enumerate(split_labels):
             y_pos = max_height + (top_padding * 0.5) + 2 - (i * top_padding * 0.15)
@@ -179,8 +182,20 @@ def split_large_groups(benchmark_groups):
 def group_benchmark_labels(benchmark_labels):
     benchmark_groups = defaultdict(list)
     for label in benchmark_labels:
-        group = re.match(r'^[^_\s]+', label)[0]
-        benchmark_groups[group].append(label)
+        # print("label before grouping", label)
+        # group = re.match(r'^[^\s]+', label)[0]
+        # print("fullregex result: ", re.match(r'^[^_\s]+', label).group())
+        # print("grouping: ", group)
+        # benchmark_groups[group].append(label)
+        # print("group:", group, "label:", benchmark_groups[group])
+        print("label before grouping", label)
+        config_pool = re.match(r'^[^#]+', label)
+        group = config_pool[0]
+        pool_label = config_pool[1]
+        print("fullregex result: ", re.match(r'^[^_\s]+', label).group())
+        print("grouping: ", group)
+        benchmark_groups[group].append(label) # HERE label -> pool_label
+        print("group:", group, "label:", benchmark_groups[group])
     print("benchmark groups:", benchmark_groups, "\n")
     return split_large_groups(benchmark_groups)
 
@@ -196,6 +211,7 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
         return []
 
     benchmark_labels = [b.label for b in benchmarks]
+    print("labels in create normalized", benchmark_labels)
 
     benchmark_groups = group_benchmark_labels(benchmark_labels)
 
