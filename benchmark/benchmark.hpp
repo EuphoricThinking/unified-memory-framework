@@ -131,7 +131,7 @@ class uniform_alloc_size : public alloc_size_interface {
     void TearDown([[maybe_unused]] ::benchmark::State &state) override {}
     size_t nextSize() override { return dist(generator) * multiplier; }
     static std::vector<std::string> argsName() {
-        return {"min size", "max size", "granularity"};
+        return {"min_size", "max_size", "granularity"};
     }
 
   private:
