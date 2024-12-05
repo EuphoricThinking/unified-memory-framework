@@ -81,7 +81,7 @@ class ComputeUMFBenchmark(Benchmark):
         results = []
         for r in parsed:
             (config, pool, mean) = r
-            label = f"{config}#{pool}"
+            label = f"{config} {pool}"
             print("label inside:", label, " || config: ", config,  " || pool: ", pool)
             results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
         return results

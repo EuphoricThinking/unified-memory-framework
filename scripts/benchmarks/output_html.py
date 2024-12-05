@@ -189,9 +189,13 @@ def group_benchmark_labels(benchmark_labels):
         # benchmark_groups[group].append(label)
         # print("group:", group, "label:", benchmark_groups[group])
         print("label before grouping", label)
-        config_pool = re.match(r'^[^#]+', label)
+        config_pool = re.match(r'^[^\s]+', label)
         group = config_pool[0]
-        pool_label = config_pool[1]
+        if config_pool:
+            print(config_pool.group())
+        else:
+            print("No hash?")
+        # pool_label = config_pool[1]
         print("fullregex result: ", re.match(r'^[^_\s]+', label).group())
         print("grouping: ", group)
         benchmark_groups[group].append(label) # HERE label -> pool_label
