@@ -99,7 +99,9 @@ struct pool_interface {
         auto umf_result = umfPoolCreate(getOps(state), provider.provider,
                                         getParams(state), 0, &pool);
         if (umf_result != UMF_RESULT_SUCCESS) {
-            state.SkipWithError("umfPoolCreate() failed");
+            std::string err_msg = "umfPoolCreate() failed";
+            err_msg += std::to_string(umf_result);
+            state.SkipWithError(err_msg);
         }
     }
     virtual void TearDown([[maybe_unused]] ::benchmark::State &state) {
