@@ -17,12 +17,13 @@ class Result:
     env: str
     stdout: str
     passed: bool = True
-    # values should not be set by the benchmark
     unit: str = ""
+    # values should not be set by the benchmark
     name: str = ""
     lower_is_better: bool = True
     git_hash: str = ''
     date: Optional[datetime] = None
+    stddev: float = 0.0
 
 @dataclass_json
 @dataclass
