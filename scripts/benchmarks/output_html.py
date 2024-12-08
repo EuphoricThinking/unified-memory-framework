@@ -249,7 +249,8 @@ def create_bar_plot(ax: plt.Axes,
 
     return max_height
 
-def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name: str) -> list[str]:
+def create_full_bar_charts(benchmarks: list[BenchmarkSeries]) -> list[str]:
+                                #  baseline_name: str) -> list[str]:
     latest_results = get_latest_results(benchmarks)
 
     run_names = sorted(list(set(
@@ -257,8 +258,8 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
         for name in result.run_values.keys()
     )))
 
-    if baseline_name not in run_names:
-        return []
+    # if baseline_name not in run_names:
+    #     return []
 
     benchmark_labels = [b.label for b in benchmarks]
     print("labels in create normalized", benchmark_labels)
@@ -288,8 +289,7 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
         fig, ax = plt.subplots(figsize=(10, 6))
         max_height = create_bar_plot(
             ax, run_values, group_benchmarks, run_names,
-            latest_results, benchmarks, baseline_name
-        )
+            latest_results, benchmarks)
         add_chart_elements(ax, group_benchmarks, group_name, max_height)
 
         plt.tight_layout()
@@ -298,11 +298,59 @@ def create_normalized_bar_chart(benchmarks: list[BenchmarkSeries], baseline_name
 
     return html_charts
 
+def format_benchmark_label(label: str) -> list[str]:
+    words = re.split(' |_', label)
+    print("WORDS", words, "\n")
+    lines = []
+    current_line = []
+
+    # max line length 30
+    for word in words:
+        if len(' '.join(current_line + [word])) > 30:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+        else:
+            current_line.append(word)
+
+    if current_line:
+        lines.append(' '.join(current_line))
+
+    print("LINES: ", lines)
+
+    return lines
+
+def add_chart_elements(ax: plt.Axes,
+                      group_benchmarks: list[str],
+                      group_name: str,
+                      max_height: float) -> None:
+    top_padding = max_height * 0.2
+    ax.set_ylim(0, max_height + top_padding)
+    ax.set_ylabel('Performance relative to baseline (%)')
+    ax.set_title(f'Performance Comparison (Normalized to Baseline) - {group_name} Group')
+    ax.set_xticks([])
+
+    for idx, label in enumerate(group_benchmarks):
+        print("label in group add_chart_elems", label)
+        split_labels = format_benchmark_label(label)
+        for i, sublabel in enumerate(split_labels):
+            y_pos = max_height + (top_padding * 0.5) + 2 - (i * top_padding * 0.15)
+            ax.text(idx, y_pos, sublabel,
+                   ha='center',
+                   style='italic',
+                   color='#666666')
+
+    ax.grid(True, axis='y', alpha=0.2)
+    ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
+
 def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_names: list[str]) -> str:
     benchmarks = process_benchmark_data(benchmark_runs, compare_names)
 
-    timeseries = create_time_series_chart(benchmarks, github_repo)
-    timeseries_charts_html = '\n'.join(f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>' for ts in timeseries)
+    comparison_html_charts = create_full_bar_charts(benchmarks)
+    timeseries_html = create_time_series_chart(benchmarks, github_repo)
+
+    # timeseries_charts_html = '\n'.join(f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>' for ts in timeseries)
+
+    comparison_charts_html = '\n'.join(f'<div class="chart"><div>{chart}</div></div>' for chart in comparison_html_charts)
 
     html_template = f"""
     <!DOCTYPE html>
@@ -353,44 +401,18 @@ def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_
                     margin-bottom: 16px;
                 }}
             }}
-            .filter-container {{
-                text-align: center;
-                margin-bottom: 24px;
-            }}
-            .filter-container input {{
-                padding: 8px;
-                font-size: 16px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                width: 400px;
-                max-width: 100%;
-            }}
         </style>
-        <script>
-            function filterCharts() {{
-                const regexInput = document.getElementById('bench-filter').value;
-                const regex = new RegExp(regexInput, 'i');
-                const charts = document.querySelectorAll('.chart');
-                charts.forEach(chart => {{
-                    const label = chart.getAttribute('data-label');
-                    if (regex.test(label)) {{
-                        chart.style.display = '';
-                    }} else {{
-                        chart.style.display = 'none';
-                    }}
-                }});
-            }}
-        </script>
     </head>
     <body>
         <div class="container">
             <h1>Benchmark Results</h1>
-            <div class="filter-container">
-                <input type="text" id="bench-filter" placeholder="Regex..." oninput="filterCharts()">
+            <h2>Latest Results Comparison</h2>
+            <div class="chart">
+                {comparison_charts_html}
             </div>
             <h2>Historical Results</h2>
-            <div class="charts">
-                {timeseries_charts_html}
+            <div class="chart">
+                {timeseries_html}
             </div>
         </div>
     </body>
