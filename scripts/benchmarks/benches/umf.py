@@ -58,9 +58,6 @@ class ComputeUMFBenchmark(Benchmark):
     def extra_env_vars(self) -> dict:
         return {}
 
-    def unit(self):
-        return "μs"
-
     def setup(self):
         if not isUMFAvailable():
             print("UMF prefix path not provided")
@@ -83,7 +80,7 @@ class ComputeUMFBenchmark(Benchmark):
             (config, pool, mean) = r
             label = f"{config} {pool}"
             print("label inside:", label, " || config: ", config,  " || pool: ", pool)
-            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result))
+            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="μs"))
         return results
 
     # if different time units - convert TODO safety check for time units
