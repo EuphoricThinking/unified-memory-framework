@@ -80,7 +80,7 @@ class ComputeUMFBenchmark(Benchmark):
             (config, pool, mean) = r
             label = f"{config} {pool}"
             print("label inside:", label, " || config: ", config,  " || pool: ", pool)
-            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="μs"))
+            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="ns"))
         return results
 
     # if different time units - convert TODO safety check for time units
