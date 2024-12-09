@@ -9,7 +9,6 @@ import mpld3
 from collections import defaultdict
 from dataclasses import dataclass
 import matplotlib.dates as mdates
-import numpy as np
 from benches.result import BenchmarkRun, Result
 
 @dataclass
@@ -27,15 +26,6 @@ class BenchmarkSeries:
 class BenchmarkTimeSeries:
     label: str
     html: str
-
-@dataclass
-class LatestResults:
-    benchmark_label: str
-    run_values: dict[str, float]
-
-    @classmethod
-    def from_dict(cls, label: str, values: dict[str, float]) -> 'LatestResults':
-        return cls(benchmark_label=label, run_values=values)
 
 def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str) -> list[BenchmarkTimeSeries]:
     plt.close('all')
@@ -127,230 +117,11 @@ def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: li
 
     return benchmark_series
 
-def get_latest_results(benchmarks: list[BenchmarkSeries]) -> dict[str, LatestResults]:
-    latest_results: dict[str, LatestResults] = {}
-    for benchmark in benchmarks:
-        run_values = {
-            run.name: max(run.results, key=lambda x: x.date).value
-            for run in benchmark.runs
-        }
-        latest_results[benchmark.label] = LatestResults.from_dict(benchmark.label, run_values)
-    return latest_results
-
-def split_large_groups(benchmark_groups):
-    miscellaneous = []
-    new_groups = defaultdict(list)
-
-    split_happened = False
-    for group, labels in benchmark_groups.items():
-        if len(labels) == 1:
-            miscellaneous.extend(labels)
-        elif len(labels) > 5:
-            split_happened = True
-            mid = len(labels) // 2
-            new_groups[group] = labels[:mid]
-            new_groups[group + ' +'] = labels[mid:]   # before: '_'
-        else:
-            new_groups[group] = labels
-
-    if miscellaneous:
-        new_groups['Miscellaneous'] = miscellaneous
-
-    if split_happened:
-        return split_large_groups(new_groups)
-    else:
-        return new_groups
-
-def group_benchmark_labels(benchmark_labels):
-    benchmark_groups = defaultdict(list)
-    for label in benchmark_labels:
-        config_pool = label.split()
-        group = config_pool[0]
-        pool_label = config_pool[1]
-        benchmark_groups[group].append(pool_label) # HERE label -> pool_label
-        print("group:", group, "label:", benchmark_groups[group])
-    print("benchmark groups:", benchmark_groups, "\n")
-    return split_large_groups(benchmark_groups)
-
-def prepare_run_values_as_list(latest_results: dict[str, LatestResults], 
-                        #   benchmarks: list[BenchmarkSeries],
-                          group_benchmarks: list[str],
-                          non_baseline_runs: list[str]) -> list[list[float]]:
-                        #   baseline_name: str) -> list[list[float]]:
-
-    normalized_data = []
-    # benchmark_map = {b.label: b for b in benchmarks}
-
-    for run_name in non_baseline_runs:
-        run_data: list[float] = []
-        for benchmark_label in group_benchmarks:
-            benchmark_data = latest_results[benchmark_label].run_values
-            # if run_name not in benchmark_data or baseline_name not in benchmark_data:
-            #     run_data.append(None)
-            #     continue
-            if run_name not in benchmark_data:
-                run_data.append(None)
-                continue
-
-
-
-            # baseline_value = benchmark_data[baseline_name]
-            current_value = benchmark_data[run_name]
-
-            # normalized_value = ((baseline_value / current_value) if benchmark_map[benchmark_label].metadata.lower_is_better
-            #                   else (current_value / baseline_value)) * 100
-            # run_data.append(normalized_value)
-            run_data.append(current_value)
-        normalized_data.append(run_data)
-    return normalized_data
-
-def create_bar_plot(ax: plt.Axes,
-                   run_values: list[list[float]],
-                   group_benchmarks: list[str],
-                   run_names: list[str],
-                   latest_results: dict[str, LatestResults],
-                   benchmarks: list[BenchmarkSeries]) -> float:
-                #    baseline_name: str) -> float:
-    x = np.arange(len(group_benchmarks))
-    width = 0.8 / len(run_names)
-    max_height = 0
-    benchmark_map = {b.label: b for b in benchmarks}
-
-    for i, (run_name, run_data) in enumerate(zip(run_names, run_values)):
-        offset = width * i - width * (len(run_names) - 1) / 2
-        positions = x + offset
-        valid_data = [v if v is not None else 0 for v in run_data]
-        rects = ax.bar(positions, valid_data, width, label=run_name)
-
-        for rect, value, benchmark_label in zip(rects, run_data, group_benchmarks):
-            if value is not None:
-                height = rect.get_height()
-                if height > max_height:
-                    max_height = height
-
-                ax.text(rect.get_x() + rect.get_width()/2., height + 2,
-                       f'{value:.1f}%',
-                       ha='center', va='bottom')
-
-                benchmark_data = latest_results[benchmark_label].run_values
-                # baseline_value = benchmark_data[baseline_name]
-                current_value = benchmark_data[run_name]
-                unit = benchmark_map[benchmark_label].metadata.unit
-
-                tooltip_labels = [
-                    f"Run: {run_name}\n"
-                    f"Value: {current_value:.2f} {unit}\n"
-                    # f"Normalized to ({baseline_name}): {baseline_value:.2f} {unit}\n"
-                    f"Unit: {unit}\n"
-                    f"Normalized: {value:.1f}%"
-                ]
-                tooltip = mpld3.plugins.LineHTMLTooltip(rect, tooltip_labels, css='.mpld3-tooltip{background:white;padding:8px;border:1px solid #ddd;border-radius:4px;font-family:monospace;white-space:pre;}')
-                mpld3.plugins.connect(ax.figure, tooltip)
-
-    return max_height
-
-def create_full_bar_charts(benchmarks: list[BenchmarkSeries]) -> list[str]:
-                                #  baseline_name: str) -> list[str]:
-    latest_results = get_latest_results(benchmarks)
-
-    run_names = sorted(list(set(
-        name for result in latest_results.values()
-        for name in result.run_values.keys()
-    )))
-
-    # if baseline_name not in run_names:
-    #     return []
-
-    benchmark_labels = [b.label for b in benchmarks]
-    print("labels in create normalized", benchmark_labels)
-
-    benchmark_groups = group_benchmark_labels(benchmark_labels)
-
-    html_charts = []
-
-    for group_name, group_benchmarks in benchmark_groups.items():
-        plt.close('all')
-        print("group name:", group_name, " | group benchmarks:", group_benchmarks, "\n")
-        # non_baseline_runs = [n for n in run_names if n != baseline_name]
-
-        # if len(non_baseline_runs) == 0:
-        #     continue
-
-        # normalized_data = prepare_normalized_data(
-        #     latest_results, benchmarks, group_benchmarks,
-        #     non_baseline_runs, baseline_name
-        # )
-
-        # nprmalized data: list[list[float]]
-        run_values = prepare_run_values_as_list(
-            latest_results, group_benchmarks,
-            run_names)
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        max_height = create_bar_plot(
-            ax, run_values, group_benchmarks, run_names,
-            latest_results, benchmarks)
-        add_chart_elements(ax, group_benchmarks, group_name, max_height)
-
-        plt.tight_layout()
-        html_charts.append(mpld3.fig_to_html(fig))
-        plt.close(fig)
-
-    return html_charts
-
-def format_benchmark_label(label: str) -> list[str]:
-    words = re.split(' |_', label)
-    print("WORDS", words, "\n")
-    lines = []
-    current_line = []
-
-    # max line length 30
-    for word in words:
-        if len(' '.join(current_line + [word])) > 30:
-            lines.append(' '.join(current_line))
-            current_line = [word]
-        else:
-            current_line.append(word)
-
-    if current_line:
-        lines.append(' '.join(current_line))
-
-    print("LINES: ", lines)
-
-    return lines
-
-def add_chart_elements(ax: plt.Axes,
-                      group_benchmarks: list[str],
-                      group_name: str,
-                      max_height: float) -> None:
-    top_padding = max_height * 0.2
-    ax.set_ylim(0, max_height + top_padding)
-    ax.set_ylabel('Performance relative to baseline (%)')
-    ax.set_title(f'Performance Comparison (Normalized to Baseline) - {group_name} Group')
-    ax.set_xticks([])
-
-    for idx, label in enumerate(group_benchmarks):
-        print("label in group add_chart_elems", label)
-        split_labels = format_benchmark_label(label)
-        for i, sublabel in enumerate(split_labels):
-            y_pos = max_height + (top_padding * 0.5) + 2 - (i * top_padding * 0.15)
-            ax.text(idx, y_pos, sublabel,
-                   ha='center',
-                   style='italic',
-                   color='#666666')
-
-    ax.grid(True, axis='y', alpha=0.2)
-    ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
-
 def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_names: list[str]) -> str:
     benchmarks = process_benchmark_data(benchmark_runs, compare_names)
 
-    comparison_html_charts = create_full_bar_charts(benchmarks)
-    timeseries_html = create_time_series_chart(benchmarks, github_repo)
-
-    # timeseries_charts_html = '\n'.join(f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>' for ts in timeseries)
-
-    comparison_charts_html = '\n'.join(f'<div class="chart"><div>{chart}</div></div>' for chart in comparison_html_charts)
+    timeseries = create_time_series_chart(benchmarks, github_repo)
+    timeseries_charts_html = '\n'.join(f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>' for ts in timeseries)
 
     html_template = f"""
     <!DOCTYPE html>
@@ -401,18 +172,44 @@ def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_
                     margin-bottom: 16px;
                 }}
             }}
+            .filter-container {{
+                text-align: center;
+                margin-bottom: 24px;
+            }}
+            .filter-container input {{
+                padding: 8px;
+                font-size: 16px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                width: 400px;
+                max-width: 100%;
+            }}
         </style>
+        <script>
+            function filterCharts() {{
+                const regexInput = document.getElementById('bench-filter').value;
+                const regex = new RegExp(regexInput, 'i');
+                const charts = document.querySelectorAll('.chart');
+                charts.forEach(chart => {{
+                    const label = chart.getAttribute('data-label');
+                    if (regex.test(label)) {{
+                        chart.style.display = '';
+                    }} else {{
+                        chart.style.display = 'none';
+                    }}
+                }});
+            }}
+        </script>
     </head>
     <body>
         <div class="container">
             <h1>Benchmark Results</h1>
-            <h2>Latest Results Comparison</h2>
-            <div class="chart">
-                {comparison_charts_html}
+            <div class="filter-container">
+                <input type="text" id="bench-filter" placeholder="Regex..." oninput="filterCharts()">
             </div>
             <h2>Historical Results</h2>
-            <div class="chart">
-                {timeseries_html}
+            <div class="charts">
+                {timeseries_charts_html}
             </div>
         </div>
     </body>

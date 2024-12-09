@@ -14,7 +14,6 @@ from benches.options import Compare, options
 from output_markdown import generate_markdown
 from output_html import generate_html
 from history import BenchmarkHistory
-from benches.umf import *
 from utils.utils import prepare_workdir;
 
 import argparse
@@ -114,11 +113,10 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
     prepare_workdir(directory, INTERNAL_WORKDIR_VERSION)
 
     suites = [
-        # ComputeBench(directory),
-        # VelocityBench(directory),
-        # SyclBench(directory),
-        # LlamaCppBench(directory),
-        UMFSuite(directory),
+        ComputeBench(directory),
+        VelocityBench(directory),
+        SyclBench(directory),
+        LlamaCppBench(directory),
         #TestSuite()
     ] if not options.dry_run else []
 
