@@ -151,7 +151,7 @@ class GBench(ComputeUMFBenchmark):
         # iterations = float(datarow[self.col_iterations])
 
         # return running_time / iterations
-        return datarow[self.col_statistics_time]
+        return float(datarow[self.col_statistics_time])
 
     def parse_output(self, output):        
         csv_file = io.StringIO(output)
