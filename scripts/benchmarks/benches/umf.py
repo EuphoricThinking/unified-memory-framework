@@ -80,7 +80,7 @@ class ComputeUMFBenchmark(Benchmark):
             (config, pool, mean) = r
             label = f"{config} {pool}"
             print("label inside:", label, " || config: ", config,  " || pool: ", pool)
-            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="ns"))
+            results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="ns", explicit_group=config))
         return results
 
     # if different time units - convert TODO safety check for time units
@@ -147,10 +147,11 @@ class GBench(ComputeUMFBenchmark):
         return list_split[self.idx_pool], list_split[self.idx_config]
 
     def get_mean(self, datarow):
-        running_time = float(datarow[self.col_statistics_time])
-        iterations = float(datarow[self.col_iterations])
+        # running_time = float(datarow[self.col_statistics_time])
+        # iterations = float(datarow[self.col_iterations])
 
-        return running_time / iterations
+        # return running_time / iterations
+        return datarow[self.col_statistics_time]
 
     def parse_output(self, output):        
         csv_file = io.StringIO(output)
