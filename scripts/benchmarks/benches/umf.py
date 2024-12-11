@@ -80,6 +80,7 @@ class ComputeUMFBenchmark(Benchmark):
             (config, pool, mean) = r
             label = f"{config} {pool}"
             print("label inside:", label, " || config: ", config,  " || pool: ", pool)
+            #label = label
             results.append(Result(label=label, value=mean, command=command, env=env_vars, stdout=result, unit="ns", explicit_group=config))
         return results
 
