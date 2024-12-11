@@ -112,15 +112,20 @@ class ExplicitGroup:
 
 def create_explicit_groups(benchmark_runs: list[BenchmarkRun], compare_names: list[str]) -> list[ExplicitGroup]:
     groups = {}
+    counted = {}
 
     for run in benchmark_runs:
         if run.name in compare_names:
             for res in run.results:
                 if res.explicit_group != '':
                     if res.explicit_group not in groups:
+                        counted[res.explicit_group] = 1
+
                         groups[res.explicit_group] = ExplicitGroup(name=res.explicit_group, nnames=len(compare_names),
                                 metadata=BenchmarkMetadata(unit=res.unit, lower_is_better=res.lower_is_better),
                                 runs={})
+                    else:
+                        counted[res.explicit_group] = counted[res.explicit_group] + 1
 
                     group = groups[res.explicit_group]
                     if res.label not in group.runs:
@@ -128,6 +133,10 @@ def create_explicit_groups(benchmark_runs: list[BenchmarkRun], compare_names: li
 
                     if group.runs[res.label][run.name] is None:
                         group.runs[res.label][run.name] = res
+
+    for key, val in counted.items():
+        if val == 1:
+            groups.pop(key)
 
     return list(groups.values())
 
