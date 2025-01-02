@@ -2,27 +2,65 @@
 // Under the Apache License v2.0 with LLVM Exceptions. See LICENSE.TXT.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <memory>
+
+#include <umf/pools/pool_disjoint.h>
+
 #include "pool.hpp"
 #include "pool/pool_disjoint_internal.h"
 #include "poolFixtures.hpp"
-#include "pool_disjoint.h"
 #include "provider.hpp"
 #include "provider_null.h"
 #include "provider_trace.h"
 
-umf_disjoint_pool_params_t poolConfig() {
-    umf_disjoint_pool_params_t config{};
-    config.SlabMinSize = 4096;
-    config.MaxPoolableSize = 4096;
-    config.Capacity = 4;
-    config.MinBucketSize = 64;
-    return config;
+using disjoint_params_unique_handle_t =
+    std::unique_ptr<umf_disjoint_pool_params_t,
+                    decltype(&umfDisjointPoolParamsDestroy)>;
+
+static constexpr size_t DEFAULT_DISJOINT_SLAB_MIN_SIZE = 4096;
+static constexpr size_t DEFAULT_DISJOINT_MAX_POOLABLE_SIZE = 4096;
+static constexpr size_t DEFAULT_DISJOINT_CAPACITY = 4;
+static constexpr size_t DEFAULT_DISJOINT_MIN_BUCKET_SIZE = 64;
+
+disjoint_params_unique_handle_t poolConfig() {
+    umf_disjoint_pool_params_handle_t config = nullptr;
+    umf_result_t res = umfDisjointPoolParamsCreate(&config);
+    if (res != UMF_RESULT_SUCCESS) {
+        throw std::runtime_error("Failed to create pool params");
+    }
+    res = umfDisjointPoolParamsSetSlabMinSize(config,
+                                              DEFAULT_DISJOINT_SLAB_MIN_SIZE);
+    if (res != UMF_RESULT_SUCCESS) {
+        umfDisjointPoolParamsDestroy(config);
+        throw std::runtime_error("Failed to set slab min size");
+    }
+    res = umfDisjointPoolParamsSetMaxPoolableSize(
+        config, DEFAULT_DISJOINT_MAX_POOLABLE_SIZE);
+    if (res != UMF_RESULT_SUCCESS) {
+        umfDisjointPoolParamsDestroy(config);
+        throw std::runtime_error("Failed to set max poolable size");
+    }
+    res = umfDisjointPoolParamsSetCapacity(config, DEFAULT_DISJOINT_CAPACITY);
+    if (res != UMF_RESULT_SUCCESS) {
+        umfDisjointPoolParamsDestroy(config);
+        throw std::runtime_error("Failed to set capacity");
+    }
+    res = umfDisjointPoolParamsSetMinBucketSize(
+        config, DEFAULT_DISJOINT_MIN_BUCKET_SIZE);
+    if (res != UMF_RESULT_SUCCESS) {
+        umfDisjointPoolParamsDestroy(config);
+        throw std::runtime_error("Failed to set min bucket size");
+    }
+
+    return disjoint_params_unique_handle_t(config,
+                                           &umfDisjointPoolParamsDestroy);
 }
 
 using umf_test::test;
 using namespace umf_test;
 
 TEST_F(test, internals) {
+<<<<<<< HEAD
     static umf_result_t expectedResult = UMF_RESULT_SUCCESS;
     struct memory_provider : public umf_test::provider_base_t {
         umf_result_t alloc(size_t size, size_t, void **ptr) noexcept {
@@ -115,17 +153,143 @@ TEST_F(test, internals) {
 }
 
 TEST_F(test, freeErrorPropagation) {
+=======
+>>>>>>> e8bc871cd537cb0b2d77812a7e40c6cff3e19720
     static umf_result_t expectedResult = UMF_RESULT_SUCCESS;
     struct memory_provider : public umf_test::provider_base_t {
-        umf_result_t alloc(size_t size, size_t, void **ptr) noexcept {
-            *ptr = malloc(size);
+        umf_result_t alloc(size_t size, size_t alignment, void **ptr) noexcept {
+            // aligned alloc expects alignment to be > 0
+            if (alignment == 0) {
+                alignment = sizeof(void *);
+            }
+#ifdef _WIN32
+            *ptr = _aligned_malloc(size, alignment);
+#else
+            *ptr = ::aligned_alloc(alignment, size);
+#endif
             return UMF_RESULT_SUCCESS;
         }
 
         umf_result_t free(void *ptr, [[maybe_unused]] size_t size) noexcept {
             // do the actual free only when we expect the success
             if (expectedResult == UMF_RESULT_SUCCESS) {
+#ifdef _WIN32
+                _aligned_free(ptr);
+#else
                 ::free(ptr);
+#endif
+            }
+            return expectedResult;
+        }
+
+        umf_result_t
+        get_min_page_size([[maybe_unused]] void *ptr,
+                          [[maybe_unused]] size_t *pageSize) noexcept {
+            *pageSize = 1024;
+            return UMF_RESULT_SUCCESS;
+        }
+    };
+    umf_memory_provider_ops_t provider_ops =
+        umf::providerMakeCOps<memory_provider, void>();
+
+    auto providerUnique =
+        wrapProviderUnique(createProviderChecked(&provider_ops, nullptr));
+
+    umf_memory_provider_handle_t provider_handle;
+    provider_handle = providerUnique.get();
+
+    umf_disjoint_pool_params_t params = *poolConfig();
+    // set to maximum tracing
+    params.pool_trace = 3;
+    params.max_poolable_size = 1024 * 1024;
+    const char *pool_name = "test";
+    params.name = (char *)pool_name;
+
+    // in "internals" test we use ops interface to directly manipulate the pool
+    // structure
+    umf_memory_pool_ops_t *ops = umfDisjointPoolOps();
+    EXPECT_NE(ops, nullptr);
+
+    disjoint_pool_t *pool;
+    umf_result_t res =
+        ops->initialize(provider_handle, &params, (void **)&pool);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+    EXPECT_NE(pool, nullptr);
+    EXPECT_EQ(pool->provider_min_page_size, 1024);
+
+    // test small allocations
+    size_t size = 8;
+    void *ptr = ops->malloc(pool, size);
+    EXPECT_NE(ptr, nullptr);
+
+    // get bucket - because of small size this should be the first bucket in
+    // the pool
+    bucket_t *bucket = pool->buckets[0];
+    EXPECT_NE(bucket, nullptr);
+
+    // check bucket stats
+    EXPECT_EQ(bucket->alloc_count, 1);
+
+    // first allocation will always use external memory (newly added to the
+    // pool) and this is counted as allocation from the outside of the pool
+    EXPECT_EQ(bucket->alloc_pool_count, 0);
+    EXPECT_EQ(bucket->curr_slabs_in_use, 1);
+
+    // check slab - there should be only single slab allocated
+    EXPECT_NE(bucket->available_slabs, nullptr);
+    EXPECT_EQ(bucket->available_slabs_num, 1);
+    EXPECT_EQ(bucket->available_slabs->next, nullptr);
+    slab_t *slab = bucket->available_slabs->val;
+
+    // check slab stats
+    EXPECT_GE(slab->slab_size, params.slab_min_size);
+    EXPECT_GE(slab->num_chunks, slab->slab_size / bucket->size);
+
+    // check allocation in slab
+    EXPECT_EQ(slab->chunks[0], true);
+    EXPECT_EQ(slab->chunks[1], false);
+    EXPECT_EQ(slab->first_free_chunk_idx, 1);
+
+    // TODO:
+    // * multiple alloc + free from single bucket
+    // * alignments
+    // * full slab alloc
+    // * slab overflow
+    // * chunked slabs
+    // * multiple alloc + free from different buckets
+    // * alloc something outside pool (> MaxPoolableSize)
+    // * test capacity
+    // * check minBucketSize
+    // * test large objects
+
+    // cleanup
+    ops->finalize(pool);
+}
+
+TEST_F(test, freeErrorPropagation) {
+    static umf_result_t expectedResult = UMF_RESULT_SUCCESS;
+    struct memory_provider : public umf_test::provider_base_t {
+        umf_result_t alloc(size_t size, size_t alignment, void **ptr) noexcept {
+            // aligned alloc expects alignment to be > 0
+            if (alignment == 0) {
+                alignment = sizeof(void *);
+            }
+#ifdef _WIN32
+            *ptr = _aligned_malloc(size, alignment);
+#else
+            *ptr = ::aligned_alloc(alignment, size);
+#endif
+            return UMF_RESULT_SUCCESS;
+        }
+
+        umf_result_t free(void *ptr, [[maybe_unused]] size_t size) noexcept {
+            // do the actual free only when we expect the success
+            if (expectedResult == UMF_RESULT_SUCCESS) {
+#ifdef _WIN32
+                _aligned_free(ptr);
+#else
+                ::free(ptr);
+#endif
             }
             return expectedResult;
         }
@@ -140,12 +304,14 @@ TEST_F(test, freeErrorPropagation) {
     provider_handle = providerUnique.get();
 
     // force all allocations to go to memory provider
-    umf_disjoint_pool_params_t params = poolConfig();
-    params.MaxPoolableSize = 0;
+    disjoint_params_unique_handle_t params = poolConfig();
+    umf_result_t retp =
+        umfDisjointPoolParamsSetMaxPoolableSize(params.get(), 0);
+    EXPECT_EQ(retp, UMF_RESULT_SUCCESS);
 
     umf_memory_pool_handle_t pool = NULL;
-    umf_result_t retp =
-        umfPoolCreate(umfDisjointPoolOps(), provider_handle, &params, 0, &pool);
+    retp = umfPoolCreate(umfDisjointPoolOps(), provider_handle, params.get(), 0,
+                         &pool);
     EXPECT_EQ(retp, UMF_RESULT_SUCCESS);
     auto poolHandle = umf_test::wrapPoolUnique(pool);
 
@@ -168,13 +334,25 @@ TEST_F(test, sharedLimits) {
     static size_t numFrees = 0;
 
     struct memory_provider : public umf_test::provider_base_t {
-        umf_result_t alloc(size_t size, size_t, void **ptr) noexcept {
-            *ptr = malloc(size);
+        umf_result_t alloc(size_t size, size_t alignment, void **ptr) noexcept {
+            // aligned alloc expects alignment to be > 0
+            if (alignment == 0) {
+                alignment = sizeof(void *);
+            }
+#ifdef _WIN32
+            *ptr = _aligned_malloc(size, alignment);
+#else
+            *ptr = ::aligned_alloc(alignment, size);
+#endif
             numAllocs++;
             return UMF_RESULT_SUCCESS;
         }
         umf_result_t free(void *ptr, [[maybe_unused]] size_t size) noexcept {
+#ifdef _WIN32
+            _aligned_free(ptr);
+#else
             ::free(ptr);
+#endif
             numFrees++;
             return UMF_RESULT_SUCCESS;
         }
@@ -185,8 +363,10 @@ TEST_F(test, sharedLimits) {
     static constexpr size_t SlabMinSize = 1024;
     static constexpr size_t MaxSize = 4 * SlabMinSize;
 
-    auto config = poolConfig();
-    config.SlabMinSize = SlabMinSize;
+    disjoint_params_unique_handle_t config = poolConfig();
+    umf_result_t ret =
+        umfDisjointPoolParamsSetSlabMinSize(config.get(), SlabMinSize);
+    EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
 
     auto limits =
         std::unique_ptr<umf_disjoint_pool_shared_limits_t,
@@ -194,20 +374,21 @@ TEST_F(test, sharedLimits) {
             umfDisjointPoolSharedLimitsCreate(MaxSize),
             &umfDisjointPoolSharedLimitsDestroy);
 
-    config.SharedLimits = limits.get();
+    ret = umfDisjointPoolParamsSetSharedLimits(config.get(), limits.get());
+    EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
 
     auto provider =
         wrapProviderUnique(createProviderChecked(&provider_ops, nullptr));
 
     umf_memory_pool_handle_t pool1 = NULL;
     umf_memory_pool_handle_t pool2 = NULL;
-    auto ret = umfPoolCreate(umfDisjointPoolOps(), provider.get(),
-                             (void *)&config, 0, &pool1);
+    ret = umfPoolCreate(umfDisjointPoolOps(), provider.get(),
+                        (void *)config.get(), 0, &pool1);
     EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
     auto poolHandle1 = umf_test::wrapPoolUnique(pool1);
 
-    ret = umfPoolCreate(umfDisjointPoolOps(), provider.get(), (void *)&config,
-                        0, &pool2);
+    ret = umfPoolCreate(umfDisjointPoolOps(), provider.get(),
+                        (void *)config.get(), 0, &pool2);
     EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
     auto poolHandle2 = umf_test::wrapPoolUnique(pool2);
 
@@ -237,21 +418,81 @@ TEST_F(test, sharedLimits) {
     EXPECT_EQ(MaxSize / SlabMinSize * 2, numFrees);
 }
 
-auto defaultPoolConfig = poolConfig();
+TEST_F(test, disjointPoolNullParams) {
+    umf_result_t res = umfDisjointPoolParamsCreate(nullptr);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    umf_disjoint_pool_params_handle_t params = nullptr;
+    res = umfDisjointPoolParamsSetSlabMinSize(params, 4096);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetMaxPoolableSize(params, 4096);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetCapacity(params, 4);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 64);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetTrace(params, 0);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetSharedLimits(params, nullptr);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetName(params, "test_disjoint_pool");
+}
+
+TEST_F(test, disjointPoolInvalidBucketSize) {
+    umf_disjoint_pool_params_handle_t params = nullptr;
+    umf_result_t res = umfDisjointPoolParamsCreate(&params);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 0);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 1);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 2);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 3);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 4);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 6);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 8);
+    EXPECT_EQ(res, UMF_RESULT_SUCCESS);
+
+    res = umfDisjointPoolParamsSetMinBucketSize(params, 24);
+    EXPECT_EQ(res, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+
+    umfDisjointPoolParamsDestroy(params);
+}
+
+disjoint_params_unique_handle_t defaultPoolConfig = poolConfig();
 INSTANTIATE_TEST_SUITE_P(disjointPoolTests, umfPoolTest,
                          ::testing::Values(poolCreateExtParams{
-                             umfDisjointPoolOps(), (void *)&defaultPoolConfig,
-                             &BA_GLOBAL_PROVIDER_OPS, nullptr, nullptr}));
+                             umfDisjointPoolOps(),
+                             (void *)defaultPoolConfig.get(),
+                             &BA_GLOBAL_PROVIDER_OPS, nullptr}));
 
 INSTANTIATE_TEST_SUITE_P(
     disjointPoolTests, umfMemTest,
     ::testing::Values(std::make_tuple(
-        poolCreateExtParams{umfDisjointPoolOps(), (void *)&defaultPoolConfig,
-                            &MOCK_OUT_OF_MEM_PROVIDER_OPS,
-                            (void *)&defaultPoolConfig.Capacity, nullptr},
-        static_cast<int>(defaultPoolConfig.Capacity) / 2)));
+        poolCreateExtParams{
+            umfDisjointPoolOps(), (void *)defaultPoolConfig.get(),
+            &MOCK_OUT_OF_MEM_PROVIDER_OPS, (void *)&DEFAULT_DISJOINT_CAPACITY},
+        static_cast<int>(DEFAULT_DISJOINT_CAPACITY) / 2)));
 
 INSTANTIATE_TEST_SUITE_P(disjointMultiPoolTests, umfMultiPoolTest,
                          ::testing::Values(poolCreateExtParams{
-                             umfDisjointPoolOps(), (void *)&defaultPoolConfig,
-                             &BA_GLOBAL_PROVIDER_OPS, nullptr, nullptr}));
+                             umfDisjointPoolOps(),
+                             (void *)defaultPoolConfig.get(),
+                             &BA_GLOBAL_PROVIDER_OPS, nullptr}));

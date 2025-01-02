@@ -23,8 +23,10 @@ extern "C" {
 #endif
 
 typedef enum umf_purge_advise_t {
-    UMF_PURGE_LAZY,
+    UMF_PURGE_LAZY = 1,
     UMF_PURGE_FORCE,
+
+    UMF_PURGE_MAX, // must be the last one
 } umf_purge_advise_t;
 
 #define DO_WHILE_EMPTY                                                         \
@@ -62,8 +64,26 @@ typedef enum umf_purge_advise_t {
 
 #endif /* _WIN32 */
 
+// get the address of the given string in the environment variable (or NULL)
+char *utils_env_var_get_str(const char *envvar, const char *str);
+
 // Check if the environment variable contains the given string.
-int utils_env_var_has_str(const char *envvar, const char *str);
+static inline int utils_env_var_has_str(const char *envvar, const char *str) {
+    return utils_env_var_get_str(envvar, str) ? 1 : 0;
+}
+
+// check if we are running in the proxy library
+static inline int utils_is_running_in_proxy_lib(void) {
+    return utils_env_var_get_str("LD_PRELOAD", "libumf_proxy.so") ? 1 : 0;
+}
+
+// check if we are running in the proxy library with a size threshold
+static inline int utils_is_running_in_proxy_lib_with_size_threshold(void) {
+    return (utils_env_var_get_str("LD_PRELOAD", "libumf_proxy.so") &&
+            utils_env_var_get_str("UMF_PROXY", "size.threshold="))
+               ? 1
+               : 0;
+}
 
 // utils_parse_var - Parses var for a prefix,
 //                   optionally identifying a following argument.
@@ -82,9 +102,6 @@ int utils_env_var_has_str(const char *envvar, const char *str);
 const char *utils_parse_var(const char *var, const char *option,
                             const char **extraArg);
 
-// check if we are running in the proxy library
-int utils_is_running_in_proxy_lib(void);
-
 size_t utils_get_page_size(void);
 
 // align a pointer up and a size down
@@ -102,6 +119,8 @@ int utils_gettid(void);
 // close file descriptor
 int utils_close_fd(int fd);
 
+umf_result_t utils_errno_to_umf_result(int err);
+
 // obtain a duplicate of another process's file descriptor
 umf_result_t utils_duplicate_fd(int pid, int fd_in, int *fd_out);
 
@@ -114,6 +133,8 @@ umf_result_t utils_translate_flags(unsigned in_flags, unsigned max,
 
 umf_result_t utils_translate_mem_protection_flags(unsigned in_protection,
                                                   unsigned *out_protection);
+
+int utils_translate_purge_advise(umf_purge_advise_t advise);
 
 umf_result_t
 utils_translate_mem_visibility_flag(umf_memory_visibility_t in_flag,
@@ -153,6 +174,11 @@ int utils_file_open_or_create(const char *path);
 
 int utils_fallocate(int fd, long offset, long len);
 
+<<<<<<< HEAD
+=======
+long utils_get_size_threshold(char *str_threshold);
+
+>>>>>>> e8bc871cd537cb0b2d77812a7e40c6cff3e19720
 size_t utils_max(size_t a, size_t b);
 
 size_t utils_min(size_t a, size_t b);

@@ -21,11 +21,16 @@ static umf_memory_pool_handle_t create_dram_pool(void) {
     umf_memory_pool_handle_t pool_dram;
     umf_result_t umf_result;
 
-    umf_os_memory_provider_params_t params_dram =
-        umfOsMemoryProviderParamsDefault();
+    umf_os_memory_provider_params_handle_t params_dram = NULL;
+    umf_result = umfOsMemoryProviderParamsCreate(&params_dram);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to create OS memory provider params!\n");
+        return NULL;
+    }
 
-    umf_result = umfMemoryProviderCreate(umfOsMemoryProviderOps(), &params_dram,
+    umf_result = umfMemoryProviderCreate(umfOsMemoryProviderOps(), params_dram,
                                          &provider_dram);
+    umfOsMemoryProviderParamsDestroy(params_dram);
     if (umf_result != UMF_RESULT_SUCCESS) {
         fprintf(stderr, "Creation of the OS memory provider failed");
         return NULL;
@@ -48,32 +53,33 @@ static umf_memory_pool_handle_t create_fsdax_pool(const char *path) {
     umf_memory_pool_handle_t pool_fsdax;
     umf_result_t umf_result;
 
-    umf_file_memory_provider_params_t params_fsdax =
-        umfFileMemoryProviderParamsDefault(path);
+    umf_file_memory_provider_params_handle_t params_fsdax = NULL;
+    umf_result = umfFileMemoryProviderParamsCreate(&params_fsdax, path);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to create the File Memory Provider params");
+        return NULL;
+    }
     // FSDAX requires mapping the UMF_MEM_MAP_SHARED flag
-    params_fsdax.visibility = UMF_MEM_MAP_SHARED;
+    umf_result = umfFileMemoryProviderParamsSetVisibility(params_fsdax,
+                                                          UMF_MEM_MAP_SHARED);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(stderr,
+                "Failed to set the visibility of the FSDAX file provider");
+        umfFileMemoryProviderParamsDestroy(params_fsdax);
+        return NULL;
+    }
 
     umf_result = umfMemoryProviderCreate(umfFileMemoryProviderOps(),
-                                         &params_fsdax, &provider_fsdax);
+                                         params_fsdax, &provider_fsdax);
+    umfFileMemoryProviderParamsDestroy(params_fsdax);
     if (umf_result != UMF_RESULT_SUCCESS) {
         fprintf(stderr, "Failed to create the FSDAX file provider");
         return NULL;
     }
 
     // Create an FSDAX memory pool
-    //
-    // The file memory provider does not support the free operation
-    // (`umfMemoryProviderFree()` always returns `UMF_RESULT_ERROR_NOT_SUPPORTED`),
-    // so it should be used with a pool manager that will take over
-    // the managing of the provided memory - for example the jemalloc pool
-    // with the `disable_provider_free` parameter set to true.
-    umf_jemalloc_pool_params_t pool_params;
-    pool_params.disable_provider_free = true;
-
-    // Create an FSDAX memory pool
-    umf_result =
-        umfPoolCreate(umfJemallocPoolOps(), provider_fsdax, &pool_params,
-                      UMF_POOL_CREATE_FLAG_OWN_PROVIDER, &pool_fsdax);
+    umf_result = umfPoolCreate(umfJemallocPoolOps(), provider_fsdax, NULL,
+                               UMF_POOL_CREATE_FLAG_OWN_PROVIDER, &pool_fsdax);
     if (umf_result != UMF_RESULT_SUCCESS) {
         fprintf(stderr, "Failed to create an FSDAX memory pool!\n");
         umfMemoryProviderDestroy(provider_fsdax);

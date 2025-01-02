@@ -99,17 +99,33 @@ int main(int argc, char *argv[]) {
     int port = atoi(argv[1]);
 
     umf_memory_provider_handle_t OS_memory_provider = NULL;
-    umf_os_memory_provider_params_t os_params;
+    umf_os_memory_provider_params_handle_t os_params = NULL;
     enum umf_result_t umf_result;
 
-    os_params = umfOsMemoryProviderParamsDefault();
-    os_params.visibility = UMF_MEM_MAP_SHARED;
+    umf_result = umfOsMemoryProviderParamsCreate(&os_params);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(
+            stderr,
+            "[consumer] ERROR: creating OS memory provider params failed\n");
+        return -1;
+    }
+    umf_result =
+        umfOsMemoryProviderParamsSetVisibility(os_params, UMF_MEM_MAP_SHARED);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "[consumer] ERROR: setting visibility mode failed\n");
+        goto err_destroy_OS_params;
+    }
     if (argc >= 3) {
-        os_params.shm_name = argv[2];
+        umf_result = umfOsMemoryProviderParamsSetShmName(os_params, argv[2]);
+        if (umf_result != UMF_RESULT_SUCCESS) {
+            fprintf(stderr,
+                    "[consumer] ERROR: setting shared memory name failed\n");
+            goto err_destroy_OS_params;
+        }
     }
 
     // create OS memory provider
-    umf_result = umfMemoryProviderCreate(umfOsMemoryProviderOps(), &os_params,
+    umf_result = umfMemoryProviderCreate(umfOsMemoryProviderOps(), os_params,
                                          &OS_memory_provider);
     if (umf_result != UMF_RESULT_SUCCESS) {
         fprintf(stderr,
@@ -124,6 +140,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,
                 "[producer] ERROR: creating jemalloc UMF pool failed\n");
         goto err_destroy_OS_memory_provider;
+    }
+
+    umf_ipc_handler_handle_t ipc_handler;
+    umf_result = umfPoolGetIPCHandler(scalable_pool, &ipc_handler);
+    if (umf_result != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "[producer] ERROR: get IPC handler failed\n");
+        goto err_destroy_scalable_pool;
     }
 
     // connect to the producer
@@ -193,7 +216,7 @@ int main(int argc, char *argv[]) {
         len);
 
     void *SHM_ptr;
-    umf_result = umfOpenIPCHandle(scalable_pool, IPC_handle, &SHM_ptr);
+    umf_result = umfOpenIPCHandle(ipc_handler, IPC_handle, &SHM_ptr);
     if (umf_result == UMF_RESULT_ERROR_NOT_SUPPORTED) {
         fprintf(stderr,
                 "[consumer] SKIP: opening the IPC handle is not supported\n");
@@ -266,6 +289,9 @@ err_destroy_scalable_pool:
 
 err_destroy_OS_memory_provider:
     umfMemoryProviderDestroy(OS_memory_provider);
+
+err_destroy_OS_params:
+    umfOsMemoryProviderParamsDestroy(os_params);
 
     if (ret == 0) {
         fprintf(stderr, "[consumer] Shutting down (status OK) ...\n");

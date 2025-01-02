@@ -92,7 +92,6 @@ jobs:
           -DUMF_BUILD_GPU_TESTS=ON
           -DUMF_BUILD_GPU_EXAMPLES=ON
           -DUMF_DEVELOPER_MODE=ON
-          -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
           -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
           -DUMF_BUILD_CUDA_PROVIDER=OFF
           -DUMF_BUILD_LEVEL_ZERO_PROVIDER=OFF
@@ -112,6 +111,7 @@ jobs:
         run: ctest --output-on-failure --test-dir examples -C ${{matrix.build_type}}
 
       - name: Run benchmarks
+        if: matrix.build_type == 'Release'
         working-directory: ${{env.BUILD_DIR}}
         run: ctest --output-on-failure --test-dir benchmark -C ${{matrix.build_type}} --exclude-regex umf-bench-multithreaded
 
@@ -128,5 +128,5 @@ jobs:
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: ${{ matrix.build_type == 'Debug' && matrix.os == 'Ubuntu' }}
         with:
-          name: ${{env.COVERAGE_NAME}}-${{matrix.os}}-${{matrix.build_type}}-shared-${{matrix.shared_library}}
+          name: ${{env.COVERAGE_NAME}}-shared-${{matrix.shared_library}}
           path: ${{env.COVERAGE_DIR}}

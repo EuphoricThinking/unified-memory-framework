@@ -91,7 +91,12 @@ static void mt_alloc_free(poolCreateExtParams params,
 }
 
 int main() {
-    auto osParams = umfOsMemoryProviderParamsDefault();
+    umf_os_memory_provider_params_handle_t osParams = nullptr;
+    umf_result_t res = umfOsMemoryProviderParamsCreate(&osParams);
+    if (res != UMF_RESULT_SUCCESS) {
+        std::cerr << "os memory provider params create failed" << std::endl;
+        return -1;
+    }
 
 #if defined(UMF_POOL_SCALABLE_ENABLED)
 
@@ -102,32 +107,40 @@ int main() {
 
     std::cout << "scalable_pool mt_alloc_free: ";
     mt_alloc_free(poolCreateExtParams{umfScalablePoolOps(), nullptr,
-                                      umfOsMemoryProviderOps(), &osParams},
+                                      umfOsMemoryProviderOps(), osParams},
                   params);
 #else
     std::cout << "skipping scalable_pool mt_alloc_free" << std::endl;
 #endif
 
-#if defined(UMF_BUILD_LIBUMF_POOL_JEMALLOC)
+#if defined(UMF_POOL_JEMALLOC_ENABLED)
     std::cout << "jemalloc_pool mt_alloc_free: ";
     mt_alloc_free(poolCreateExtParams{umfJemallocPoolOps(), nullptr,
-                                      umfOsMemoryProviderOps(), &osParams});
+                                      umfOsMemoryProviderOps(), osParams});
 #else
     std::cout << "skipping jemalloc_pool mt_alloc_free" << std::endl;
 #endif
 
-#if defined(UMF_BUILD_LIBUMF_POOL_DISJOINT)
-    auto disjointParams = umfDisjointPoolParamsDefault();
+    // NOTE: disjoint pool is always enabled
+    umf_disjoint_pool_params_handle_t hDisjointParams = nullptr;
+    umf_result_t ret = umfDisjointPoolParamsCreate(&hDisjointParams);
+    if (ret != UMF_RESULT_SUCCESS) {
+        std::cerr << "disjoint pool params create failed" << std::endl;
+        return -1;
+    }
 
     std::cout << "disjoint_pool mt_alloc_free: ";
-    mt_alloc_free(poolCreateExtParams{umfDisjointPoolOps(), &disjointParams,
-                                      umfOsMemoryProviderOps(), &osParams});
-#else
-    std::cout << "skipping disjoint_pool mt_alloc_free" << std::endl;
-#endif
+    mt_alloc_free(poolCreateExtParams{umfDisjointPoolOps(), hDisjointParams,
+                                      umfOsMemoryProviderOps(), osParams});
 
     // ctest looks for "PASSED" in the output
     std::cout << "PASSED" << std::endl;
+
+    ret = umfDisjointPoolParamsDestroy(hDisjointParams);
+    if (ret != UMF_RESULT_SUCCESS) {
+        std::cerr << "disjoint pool params destroy failed" << std::endl;
+        return -1;
+    }
 
     return 0;
 }

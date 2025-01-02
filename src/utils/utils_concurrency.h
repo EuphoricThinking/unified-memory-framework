@@ -45,10 +45,26 @@ typedef struct utils_mutex_t {
 } utils_mutex_t;
 
 size_t utils_mutex_get_size(void);
-utils_mutex_t *utils_mutex_init(void *ptr);
+utils_mutex_t *utils_mutex_init(utils_mutex_t *ptr);
 void utils_mutex_destroy_not_free(utils_mutex_t *m);
 int utils_mutex_lock(utils_mutex_t *mutex);
 int utils_mutex_unlock(utils_mutex_t *mutex);
+
+typedef struct utils_rwlock_t {
+#ifdef _WIN32
+    // Slim Read/Wrtiter lock
+    SRWLOCK lock;
+#else
+    pthread_rwlock_t rwlock;
+#endif
+} utils_rwlock_t;
+
+utils_rwlock_t *utils_rwlock_init(utils_rwlock_t *ptr);
+void utils_rwlock_destroy_not_free(utils_rwlock_t *rwlock);
+int utils_read_lock(utils_rwlock_t *rwlock);
+int utils_write_lock(utils_rwlock_t *rwlock);
+int utils_read_unlock(utils_rwlock_t *rwlock);
+int utils_write_unlock(utils_rwlock_t *rwlock);
 
 #if defined(_WIN32)
 #define UTIL_ONCE_FLAG INIT_ONCE
@@ -93,9 +109,15 @@ static __inline unsigned char utils_mssb_index(long long value) {
 #define utils_fetch_and_add64(ptr, value)                                      \
     InterlockedExchangeAdd64((LONG64 *)(ptr), value)
 
+<<<<<<< HEAD
 #define utils_compare_exchange(object, expected, desired)                      \
     InterlockedCompareExchangePointer((LONG64 volatile *)object, expected,     \
                                       desired)
+=======
+// NOTE: windows version have different order of args
+#define utils_compare_exchange(object, desired, expected)                      \
+    InterlockedCompareExchange64((LONG64 volatile *)object, *expected, *desired)
+>>>>>>> e8bc871cd537cb0b2d77812a7e40c6cff3e19720
 
 #else // !defined(_WIN32)
 

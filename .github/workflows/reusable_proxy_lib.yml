@@ -32,7 +32,7 @@ jobs:
       - name: Install apt packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libhwloc-dev libjemalloc-dev libtbb-dev lcov
+          sudo apt-get install -y cmake libhwloc-dev libtbb-dev lcov
 
       - name: Set ptrace value for IPC test
         run: sudo bash -c "echo 0 > /proc/sys/kernel/yama/ptrace_scope"
@@ -51,7 +51,6 @@ jobs:
           -DUMF_FORMAT_CODE_STYLE=OFF
           -DUMF_DEVELOPER_MODE=OFF
           -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
-          -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
           -DUMF_TESTS_FAIL_ON_SKIP=ON
           -DUMF_PROXY_LIB_BASED_ON_POOL=${{matrix.proxy_lib_pool}}
           ${{ matrix.build_type == 'Debug' && '-DUMF_USE_COVERAGE=ON' || '' }}
@@ -59,11 +58,9 @@ jobs:
       - name: Build UMF
         run: cmake --build ${{env.BUILD_DIR}} -j $(nproc)
 
-      # TODO enable the provider_file_memory_ipc test when the IPC tests with the proxy library are fixed
-      # see the issue: https://github.com/oneapi-src/unified-memory-framework/issues/864
       - name: Run "ctest --output-on-failure" with proxy library
         working-directory: ${{env.BUILD_DIR}}
-        run: LD_PRELOAD=./lib/libumf_proxy.so ctest --output-on-failure -E provider_file_memory_ipc
+        run: LD_PRELOAD=./lib/libumf_proxy.so ctest --output-on-failure
 
       - name: Run "./test/umf_test-memoryPool" with proxy library
         working-directory: ${{env.BUILD_DIR}}
@@ -76,6 +73,13 @@ jobs:
       - name: Run "/usr/bin/date" with proxy library
         working-directory: ${{env.BUILD_DIR}}
         run: UMF_PROXY="page.disposition=shared-shm" LD_PRELOAD=./lib/libumf_proxy.so /usr/bin/date
+
+      - name: Run "ctest --output-on-failure" with proxy library and size.threshold=128
+        working-directory: ${{env.BUILD_DIR}}
+        run: >
+          UMF_PROXY="page.disposition=shared-shm;size.threshold=128"
+          LD_PRELOAD=./lib/libumf_proxy.so
+          ctest --output-on-failure
 
       - name: Check coverage
         if:  ${{ matrix.build_type == 'Debug' }}

@@ -7,8 +7,8 @@
 
 #include "pool.hpp"
 #include "provider.hpp"
-#include "umf/providers/provider_coarse.h"
 #include "umf/providers/provider_devdax_memory.h"
+#include "utils/utils_sanitizers.h"
 
 #include <array>
 #include <cstring>
@@ -19,13 +19,11 @@
 
 #include "../malloc_compliance_tests.hpp"
 
-using poolCreateExtParams =
-    std::tuple<umf_memory_pool_ops_t *, void *, umf_memory_provider_ops_t *,
-               void *, void *>;
+using poolCreateExtParams = std::tuple<umf_memory_pool_ops_t *, void *,
+                                       umf_memory_provider_ops_t *, void *>;
 
 umf::pool_unique_handle_t poolCreateExtUnique(poolCreateExtParams params) {
-    auto [pool_ops, pool_params, provider_ops, provider_params, coarse_params] =
-        params;
+    auto [pool_ops, pool_params, provider_ops, provider_params] = params;
 
     umf_memory_provider_handle_t upstream_provider = nullptr;
     umf_memory_provider_handle_t provider = nullptr;
@@ -39,22 +37,6 @@ umf::pool_unique_handle_t poolCreateExtUnique(poolCreateExtParams params) {
 
     provider = upstream_provider;
 
-    if (coarse_params) {
-        coarse_memory_provider_params_t *coarse_memory_provider_params =
-            (coarse_memory_provider_params_t *)coarse_params;
-        coarse_memory_provider_params->upstream_memory_provider =
-            upstream_provider;
-        coarse_memory_provider_params->destroy_upstream_memory_provider = true;
-
-        umf_memory_provider_handle_t coarse_provider = nullptr;
-        ret = umfMemoryProviderCreate(umfCoarseMemoryProviderOps(),
-                                      coarse_params, &coarse_provider);
-        EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
-        EXPECT_NE(coarse_provider, nullptr);
-
-        provider = coarse_provider;
-    }
-
     ret = umfPoolCreate(pool_ops, provider, pool_params,
                         UMF_POOL_CREATE_FLAG_OWN_PROVIDER, &hPool);
     EXPECT_EQ(ret, UMF_RESULT_SUCCESS);
@@ -67,22 +49,6 @@ struct umfPoolTest : umf_test::test,
                      ::testing::WithParamInterface<poolCreateExtParams> {
     void SetUp() override {
         test::SetUp();
-
-        auto [pool_ops, pool_params, provider_ops, provider_params,
-              coarse_params] = this->GetParam();
-        if (provider_ops == umfDevDaxMemoryProviderOps()) {
-            char *path = getenv("UMF_TESTS_DEVDAX_PATH");
-            if (path == nullptr || path[0] == 0) {
-                GTEST_SKIP()
-                    << "Test skipped, UMF_TESTS_DEVDAX_PATH is not set";
-            }
-
-            char *size = getenv("UMF_TESTS_DEVDAX_SIZE");
-            if (size == nullptr || size[0] == 0) {
-                GTEST_SKIP()
-                    << "Test skipped, UMF_TESTS_DEVDAX_SIZE is not set";
-            }
-        }
 
         pool = poolCreateExtUnique(this->GetParam());
     }
@@ -454,6 +420,29 @@ TEST_P(umfPoolTest, free_compliance) { free_compliance_test(pool.get()); }
 TEST_P(umfPoolTest, allocMaxSize) {
     auto *ptr = umfPoolMalloc(pool.get(), SIZE_MAX);
     ASSERT_EQ(ptr, nullptr);
+}
+
+TEST_P(umfPoolTest, mallocUsableSize) {
+#ifdef __SANITIZE_ADDRESS__
+    // Sanitizer replaces malloc_usable_size implementation with its own
+    GTEST_SKIP()
+        << "This test is invalid with AddressSanitizer instrumentation";
+#else
+
+    for (size_t allocSize : {32, 48, 1024, 8192}) {
+        char *ptr = static_cast<char *>(umfPoolMalloc(pool.get(), allocSize));
+        ASSERT_NE(ptr, nullptr);
+        size_t result = umfPoolMallocUsableSize(pool.get(), ptr);
+        ASSERT_TRUE(result == 0 || result >= allocSize);
+
+        // Make sure we can write to this memory
+        for (size_t i = 0; i < result; i++) {
+            ptr[i] = 123;
+        }
+
+        umfPoolFree(pool.get(), ptr);
+    }
+#endif
 }
 
 #endif /* UMF_TEST_POOL_FIXTURES_HPP */

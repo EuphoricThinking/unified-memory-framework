@@ -43,14 +43,15 @@ TEST_F(test, memoryProviderTrace) {
     ASSERT_EQ(calls["get_last_native_error"], 1);
     ASSERT_EQ(calls.size(), ++call_count);
 
+    size_t page_size;
     ret = umfMemoryProviderGetRecommendedPageSize(tracingProvider.get(), 0,
-                                                  nullptr);
+                                                  &page_size);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(calls["get_recommended_page_size"], 1);
     ASSERT_EQ(calls.size(), ++call_count);
 
     ret = umfMemoryProviderGetMinPageSize(tracingProvider.get(), nullptr,
-                                          nullptr);
+                                          &page_size);
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(calls["get_min_page_size"], 1);
     ASSERT_EQ(calls.size(), ++call_count);
@@ -60,12 +61,14 @@ TEST_F(test, memoryProviderTrace) {
     ASSERT_EQ(calls.size(), ++call_count);
     ASSERT_EQ(std::string(pName), std::string("null"));
 
-    ret = umfMemoryProviderPurgeLazy(tracingProvider.get(), nullptr, 0);
+    ret = umfMemoryProviderPurgeLazy(tracingProvider.get(), &page_size,
+                                     sizeof(page_size));
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(calls["purge_lazy"], 1);
     ASSERT_EQ(calls.size(), ++call_count);
 
-    ret = umfMemoryProviderPurgeForce(tracingProvider.get(), nullptr, 0);
+    ret = umfMemoryProviderPurgeForce(tracingProvider.get(), &page_size,
+                                      sizeof(page_size));
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
     ASSERT_EQ(calls["purge_force"], 1);
     ASSERT_EQ(calls.size(), ++call_count);
@@ -86,19 +89,6 @@ TEST_F(test, memoryProviderTrace) {
     ASSERT_EQ(calls.size(), ++call_count);
 }
 
-TEST_F(test, memoryProviderOpsNullFreeField) {
-    umf_memory_provider_ops_t provider_ops = UMF_NULL_PROVIDER_OPS;
-    provider_ops.ext.free = nullptr;
-    umf_memory_provider_handle_t hProvider;
-    auto ret = umfMemoryProviderCreate(&provider_ops, nullptr, &hProvider);
-    ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
-
-    ret = umfMemoryProviderFree(hProvider, nullptr, 0);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
-
-    umfMemoryProviderDestroy(hProvider);
-}
-
 TEST_F(test, memoryProviderOpsNullPurgeLazyField) {
     umf_memory_provider_ops_t provider_ops = UMF_NULL_PROVIDER_OPS;
     provider_ops.ext.purge_lazy = nullptr;
@@ -107,7 +97,7 @@ TEST_F(test, memoryProviderOpsNullPurgeLazyField) {
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     ret = umfMemoryProviderPurgeLazy(hProvider, nullptr, 0);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     umfMemoryProviderDestroy(hProvider);
 }
@@ -120,7 +110,7 @@ TEST_F(test, memoryProviderOpsNullPurgeForceField) {
     ASSERT_EQ(ret, UMF_RESULT_SUCCESS);
 
     ret = umfMemoryProviderPurgeForce(hProvider, nullptr, 0);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     umfMemoryProviderDestroy(hProvider);
 }
@@ -165,16 +155,16 @@ TEST_F(test, memoryProviderOpsNullAllIPCFields) {
     void *ptr = nullptr;
     void *providerIpcData = nullptr;
     ret = umfMemoryProviderGetIPCHandle(hProvider, ptr, size, providerIpcData);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     ret = umfMemoryProviderPutIPCHandle(hProvider, providerIpcData);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     ret = umfMemoryProviderOpenIPCHandle(hProvider, providerIpcData, &ptr);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     ret = umfMemoryProviderCloseIPCHandle(hProvider, ptr, size);
-    ASSERT_EQ(ret, UMF_RESULT_ERROR_NOT_SUPPORTED);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
 
     umfMemoryProviderDestroy(hProvider);
 }
@@ -196,6 +186,14 @@ TEST_F(test, memoryProviderNullPoolHandle) {
 TEST_F(test, memoryProviderOpsNullAllocField) {
     umf_memory_provider_ops_t provider_ops = UMF_NULL_PROVIDER_OPS;
     provider_ops.alloc = nullptr;
+    umf_memory_provider_handle_t hProvider;
+    auto ret = umfMemoryProviderCreate(&provider_ops, nullptr, &hProvider);
+    ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);
+}
+
+TEST_F(test, memoryProviderOpsNullFreeField) {
+    umf_memory_provider_ops_t provider_ops = UMF_NULL_PROVIDER_OPS;
+    provider_ops.free = nullptr;
     umf_memory_provider_handle_t hProvider;
     auto ret = umfMemoryProviderCreate(&provider_ops, nullptr, &hProvider);
     ASSERT_EQ(ret, UMF_RESULT_ERROR_INVALID_ARGUMENT);

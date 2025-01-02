@@ -17,6 +17,11 @@
 #include "utils_log.h"
 #include "utlist.h"
 
+// HASH_ADD macro produces `warning C4702: unreachable code` on MSVC
+#ifdef _MSC_VER
+#pragma warning(disable : 4702)
+#endif
+
 struct ipc_handle_cache_entry_t;
 
 typedef struct ipc_handle_cache_entry_t *hash_map_t;
@@ -89,12 +94,14 @@ err_exit:
     return ret;
 }
 
+#ifndef NDEBUG
 static size_t getGlobalLruListSize(lru_list_t lru_list) {
     size_t size = 0;
     ipc_handle_cache_entry_t *tmp;
     DL_COUNT(lru_list, tmp, size);
     return size;
 }
+#endif /* NDEBUG */
 
 void umfIpcCacheGlobalTearDown(void) {
     ipc_mapped_handle_cache_global_t *cache_global = IPC_MAPPED_CACHE_GLOBAL;

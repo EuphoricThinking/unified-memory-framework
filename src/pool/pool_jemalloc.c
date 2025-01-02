@@ -20,25 +20,19 @@
 #include <umf/memory_pool_ops.h>
 #include <umf/pools/pool_jemalloc.h>
 
-#include <jemalloc/jemalloc.h>
+#ifndef UMF_POOL_JEMALLOC_ENABLED
 
-// The Windows version of jemalloc uses API with je_ prefix,
-// while the Linux one does not.
-#ifndef _WIN32
-#define je_mallocx mallocx
-#define je_dallocx dallocx
-#define je_rallocx rallocx
-#define je_mallctl mallctl
-#define je_malloc_usable_size malloc_usable_size
-#endif
+umf_memory_pool_ops_t *umfJemallocPoolOps(void) { return NULL; }
+
+#else
+
+#include <jemalloc/jemalloc.h>
 
 #define MALLOCX_ARENA_MAX (MALLCTL_ARENAS_ALL - 1)
 
 typedef struct jemalloc_memory_pool_t {
     umf_memory_provider_handle_t provider;
     unsigned int arena_index; // index of jemalloc arena
-    // set to true if umfMemoryProviderFree() should never be called
-    bool disable_provider_free;
 } jemalloc_memory_pool_t;
 
 static __TLS umf_result_t TLS_last_allocation_error;
@@ -82,9 +76,7 @@ static void *arena_extent_alloc(extent_hooks_t *extent_hooks, void *new_addr,
     }
 
     if (new_addr != NULL && ptr != new_addr) {
-        if (!pool->disable_provider_free) {
-            umfMemoryProviderFree(pool->provider, ptr, size);
-        }
+        umfMemoryProviderFree(pool->provider, ptr, size);
         return NULL;
     }
 
@@ -118,10 +110,6 @@ static void arena_extent_destroy(extent_hooks_t *extent_hooks, void *addr,
 
     jemalloc_memory_pool_t *pool = get_pool_by_arena_index(arena_ind);
 
-    if (pool->disable_provider_free) {
-        return;
-    }
-
     umf_result_t ret;
     ret = umfMemoryProviderFree(pool->provider, addr, size);
     if (ret != UMF_RESULT_SUCCESS) {
@@ -143,10 +131,6 @@ static bool arena_extent_dalloc(extent_hooks_t *extent_hooks, void *addr,
     (void)committed;    // unused
 
     jemalloc_memory_pool_t *pool = get_pool_by_arena_index(arena_ind);
-
-    if (pool->disable_provider_free) {
-        return true; // opt-out from deallocation
-    }
 
     umf_result_t ret;
     ret = umfMemoryProviderFree(pool->provider, addr, size);
@@ -398,11 +382,9 @@ static void *op_aligned_alloc(void *pool, size_t size, size_t alignment) {
 
 static umf_result_t op_initialize(umf_memory_provider_handle_t provider,
                                   void *params, void **out_pool) {
+    (void)params; // unused
     assert(provider);
     assert(out_pool);
-
-    umf_jemalloc_pool_params_t *je_params =
-        (umf_jemalloc_pool_params_t *)params;
 
     extent_hooks_t *pHooks = &arena_extent_hooks;
     size_t unsigned_size = sizeof(unsigned);
@@ -415,12 +397,6 @@ static umf_result_t op_initialize(umf_memory_provider_handle_t provider,
     }
 
     pool->provider = provider;
-
-    if (je_params) {
-        pool->disable_provider_free = je_params->disable_provider_free;
-    } else {
-        pool->disable_provider_free = false;
-    }
 
     unsigned arena_index;
     err = je_mallctl("arenas.create", (void *)&arena_index, &unsigned_size,
@@ -436,7 +412,7 @@ static umf_result_t op_initialize(umf_memory_provider_handle_t provider,
     err = je_mallctl(cmd, NULL, NULL, (void *)&pHooks, sizeof(void *));
     if (err) {
         snprintf(cmd, sizeof(cmd), "arena.%u.destroy", arena_index);
-        je_mallctl(cmd, NULL, 0, NULL, 0);
+        (void)je_mallctl(cmd, NULL, 0, NULL, 0);
         LOG_ERR("Could not setup extent_hooks for newly created arena.");
         goto err_free_pool;
     }
@@ -460,7 +436,7 @@ static void op_finalize(void *pool) {
     jemalloc_memory_pool_t *je_pool = (jemalloc_memory_pool_t *)pool;
     char cmd[64];
     snprintf(cmd, sizeof(cmd), "arena.%u.destroy", je_pool->arena_index);
-    je_mallctl(cmd, NULL, 0, NULL, 0);
+    (void)je_mallctl(cmd, NULL, 0, NULL, 0);
     pool_by_arena_index[je_pool->arena_index] = NULL;
     umf_ba_global_free(je_pool);
 
@@ -493,3 +469,4 @@ static umf_memory_pool_ops_t UMF_JEMALLOC_POOL_OPS = {
 umf_memory_pool_ops_t *umfJemallocPoolOps(void) {
     return &UMF_JEMALLOC_POOL_OPS;
 }
+#endif /* UMF_POOL_JEMALLOC_ENABLED */

@@ -43,47 +43,99 @@ int main(void) {
     // Create a context on the device
     cuCtxCreate(&cuContext, 0, cuDevice);
 
-    // Setup parameters for the CUDA memory provider. It will be used for
+    // Setup parameters for the CUDA Memory Provider. It will be used for
     // allocating memory from CUDA devices.
-    cuda_memory_provider_params_t cu_memory_provider_params;
-    cu_memory_provider_params.cuda_context_handle = cuContext;
-    cu_memory_provider_params.cuda_device_handle = cuDevice;
+    umf_cuda_memory_provider_params_handle_t cu_memory_provider_params = NULL;
+    res = umfCUDAMemoryProviderParamsCreate(&cu_memory_provider_params);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to create memory provider params!\n");
+        ret = -1;
+        goto cuda_destroy;
+    }
+
+    res = umfCUDAMemoryProviderParamsSetContext(cu_memory_provider_params,
+                                                cuContext);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set context in memory provider params!\n");
+        ret = -1;
+        goto provider_params_destroy;
+    }
+
+    res = umfCUDAMemoryProviderParamsSetDevice(cu_memory_provider_params,
+                                               cuDevice);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set device in memory provider params!\n");
+        ret = -1;
+        goto provider_params_destroy;
+    }
     // Set the memory type to shared to allow the memory to be accessed on both
     // CPU and GPU.
-    cu_memory_provider_params.memory_type = UMF_MEMORY_TYPE_SHARED;
+    res = umfCUDAMemoryProviderParamsSetMemoryType(cu_memory_provider_params,
+                                                   UMF_MEMORY_TYPE_SHARED);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr,
+                "Failed to set memory type in memory provider params!\n");
+        ret = -1;
+        goto provider_params_destroy;
+    }
 
     // Create CUDA memory provider
     umf_memory_provider_handle_t cu_memory_provider;
-    res = umfMemoryProviderCreate(umfCUDAMemoryProviderOps(),
-                                  &cu_memory_provider_params,
-                                  &cu_memory_provider);
+    res =
+        umfMemoryProviderCreate(umfCUDAMemoryProviderOps(),
+                                cu_memory_provider_params, &cu_memory_provider);
     if (res != UMF_RESULT_SUCCESS) {
         fprintf(stderr, "Failed to create a memory provider!\n");
         ret = -1;
-        goto cuda_destroy;
+        goto provider_params_destroy;
     }
 
     printf("CUDA memory provider created at %p\n", (void *)cu_memory_provider);
 
     // Setup parameters for the Disjoint Pool. It will be used for managing the
     // memory allocated using memory provider.
-    umf_disjoint_pool_params_t disjoint_memory_pool_params =
-        umfDisjointPoolParamsDefault();
+    umf_disjoint_pool_params_handle_t hDisjointParams = NULL;
+    res = umfDisjointPoolParamsCreate(&hDisjointParams);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "disjoint pool params create failed\n");
+        ret = -1;
+        goto memory_provider_destroy;
+    }
     // Set the Slab Min Size to 64KB - the page size for GPU allocations
-    disjoint_memory_pool_params.SlabMinSize = 64 * 1024L;
+    res = umfDisjointPoolParamsSetSlabMinSize(hDisjointParams, 64 * 1024L);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set the slab min size!\n");
+        ret = -1;
+        goto pool_params_destroy;
+    }
     // We would keep only single slab per each allocation bucket
-    disjoint_memory_pool_params.Capacity = 1;
+    res = umfDisjointPoolParamsSetCapacity(hDisjointParams, 1);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set the capacity!\n");
+        ret = -1;
+        goto pool_params_destroy;
+    }
     // Set the maximum poolable size to 64KB - objects with size above this
     // limit will not be stored/allocated from the pool.
-    disjoint_memory_pool_params.MaxPoolableSize = 64 * 1024L;
+    res = umfDisjointPoolParamsSetMaxPoolableSize(hDisjointParams, 64 * 1024L);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set the max poolable size!\n");
+        ret = -1;
+        goto pool_params_destroy;
+    }
     // Enable tracing
-    disjoint_memory_pool_params.PoolTrace = 1;
+    res = umfDisjointPoolParamsSetTrace(hDisjointParams, 1);
+    if (res != UMF_RESULT_SUCCESS) {
+        fprintf(stderr, "Failed to set the pool trace!\n");
+        ret = -1;
+        goto pool_params_destroy;
+    }
 
     // Create Disjoint Pool memory pool.
     umf_memory_pool_handle_t cu_disjoint_memory_pool;
-    res = umfPoolCreate(umfDisjointPoolOps(), cu_memory_provider,
-                        &disjoint_memory_pool_params, UMF_POOL_CREATE_FLAG_NONE,
-                        &cu_disjoint_memory_pool);
+    res =
+        umfPoolCreate(umfDisjointPoolOps(), cu_memory_provider, hDisjointParams,
+                      UMF_POOL_CREATE_FLAG_NONE, &cu_disjoint_memory_pool);
     if (res != UMF_RESULT_SUCCESS) {
         fprintf(stderr, "Failed to create a memory pool!\n");
         ret = -1;
@@ -116,8 +168,14 @@ int main(void) {
 memory_pool_destroy:
     umfPoolDestroy(cu_disjoint_memory_pool);
 
+pool_params_destroy:
+    umfDisjointPoolParamsDestroy(hDisjointParams);
+
 memory_provider_destroy:
     umfMemoryProviderDestroy(cu_memory_provider);
+
+provider_params_destroy:
+    umfCUDAMemoryProviderParamsDestroy(cu_memory_provider_params);
 
 cuda_destroy:
     ret = cuCtxDestroy(cuContext);

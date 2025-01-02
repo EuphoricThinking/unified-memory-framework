@@ -31,11 +31,20 @@ the OS Memory Provider API::
 
     #include "umf/providers/provider_os_memory.h"
 
-Get a pointer to the OS memory provider operations struct and
-a copy of default parameters::
+Get a pointer to the OS memory provider operations struct::
 
     umf_memory_provider_ops_t *provider_ops = umfOsMemoryProviderOps();
-    umf_os_memory_provider_params_t params = umfOsMemoryProviderParamsDefault();
+
+Get a default OS memory provider parameters. The handle to the parameters object
+is returned by the :any:`umfOsMemoryProviderParamsCreate` function::
+
+    umf_os_memory_provider_params_handle_t params = NULL;
+
+    res = umfOsMemoryProviderParamsCreate(&params);
+    if (res != UMF_RESULT_SUCCESS) {
+        printf("Failed to create OS memory provider params!\n");
+        return -1;
+    }
 
 The handle to created memory ``provider`` object is returned as the last argument
 of :any:`umfMemoryProviderCreate`::
@@ -43,7 +52,10 @@ of :any:`umfMemoryProviderCreate`::
     umf_memory_provider_handle_t provider;
     umfMemoryProviderCreate(provider_ops, &params, &provider);
 
-With this handle we can allocate a chunk of memory, call :any:`umfMemoryProviderAlloc`::
+The ``params`` object can be destroyed after the provider is created::
+    umfOsMemoryProviderParamsDestroy(params);
+
+With the ``provider`` handle we can allocate a chunk of memory, call :any:`umfMemoryProviderAlloc`::
 
     size_t alloc_size = 5000;
     size_t alignment = 0;
@@ -182,12 +194,15 @@ to another process it can be opened by the :any:`umfOpenIPCHandle` function.
 
 .. code-block:: c
 
-    void *mapped_buf = NULL;
-    umf_result = umfOpenIPCHandle(consumer_pool, ipc_handle, &mapped_buf);
+    umf_ipc_handler_handle_t ipc_handler = 0;
+    umf_result = umfPoolGetIPCHandler(consumer_pool, &ipc_handler);
 
-The :any:`umfOpenIPCHandle` function requires the memory pool handle and the IPC handle as input parameters. It maps
+    void *mapped_buf = NULL;
+    umf_result = umfOpenIPCHandle(ipc_handler, ipc_handle, &mapped_buf);
+
+The :any:`umfOpenIPCHandle` function requires the IPC handler and the IPC handle as input parameters. The IPC handler maps
 the handle to the current process address space and returns the pointer to the same memory region that was allocated
-in the producer process.
+in the producer process. To retrieve the IPC handler, the :any:`umfPoolGetIPCHandler` function is used.
 
 .. note::
     The virtual addresses of the memory region referred to by the IPC handle may not be the same in the producer and consumer processes.

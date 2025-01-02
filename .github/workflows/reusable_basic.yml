@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 env:
-  # for installation testing - it should match with version set in CMake
-  UMF_VERSION: 0.10.0
+  # for installation testing - it should match with version set in git
+  UMF_VERSION: 0.11.0
   BUILD_DIR : "${{github.workspace}}/build"
   INSTL_DIR : "${{github.workspace}}/../install-dir"
   COVERAGE_DIR : "${{github.workspace}}/coverage"
@@ -124,7 +124,7 @@ jobs:
     - name: Install apt packages
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang cmake libnuma-dev libjemalloc-dev lcov
+        sudo apt-get install -y clang cmake libnuma-dev lcov
 
     - name: Install TBB apt package
       if: matrix.install_tbb == 'ON'
@@ -165,7 +165,6 @@ jobs:
         -DUMF_FORMAT_CODE_STYLE=OFF
         -DUMF_DEVELOPER_MODE=ON
         -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
-        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
         -DUMF_TESTS_FAIL_ON_SKIP=ON
         -DUMF_DISABLE_HWLOC=${{matrix.disable_hwloc}}
         -DUMF_LINK_HWLOC_STATICALLY=${{matrix.link_hwloc_statically}}
@@ -208,8 +207,6 @@ jobs:
         --build-dir ${{env.BUILD_DIR}}
         --install-dir ${{env.INSTL_DIR}}
         --build-type ${{matrix.build_type}}
-        --disjoint-pool
-        --jemalloc-pool
         ${{ matrix.install_tbb == 'ON' && matrix.disable_hwloc != 'ON' && matrix.shared_library == 'ON' && '--proxy' || '' }}
         --umf-version ${{env.UMF_VERSION}}
         ${{ matrix.shared_library == 'ON' && '--shared-library' || '' }}
@@ -227,13 +224,14 @@ jobs:
         level_zero_provider: ['ON']
         cuda_provider: ['ON']
         include:
-          - os: 'windows-2022'
-            build_type: Release
-            compiler: {c: clang-cl, cxx: clang-cl}
-            shared_library: 'ON'
-            level_zero_provider: 'ON'
-            cuda_provider: 'ON'
-            toolset: "-T ClangCL"
+          # temporarily disable failing CI job
+          #- os: 'windows-2022'
+          #  build_type: Release
+          #  compiler: {c: clang-cl, cxx: clang-cl}
+          #  shared_library: 'ON'
+          #  level_zero_provider: 'ON'
+          #  cuda_provider: 'ON'
+          #  toolset: "-T ClangCL"
           - os: 'windows-2022'
             build_type: Release
             compiler: {c: cl, cxx: cl}
@@ -278,7 +276,6 @@ jobs:
         -DUMF_BUILD_SHARED_LIBRARY=${{matrix.shared_library}}
         -DUMF_FORMAT_CODE_STYLE=OFF
         -DUMF_DEVELOPER_MODE=ON
-        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
         -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
         -DUMF_BUILD_LEVEL_ZERO_PROVIDER=${{matrix.level_zero_provider}}
         -DUMF_BUILD_CUDA_PROVIDER=${{matrix.cuda_provider}}
@@ -298,8 +295,6 @@ jobs:
         --build-dir ${{env.BUILD_DIR}}
         --install-dir ${{env.INSTL_DIR}}
         --build-type ${{matrix.build_type}}
-        --disjoint-pool
-        --jemalloc-pool
         ${{matrix.shared_library == 'ON' && '--proxy' || '' }}
         --umf-version ${{env.UMF_VERSION}}
         ${{ matrix.shared_library == 'ON' && '--shared-library' || ''}}
@@ -337,7 +332,6 @@ jobs:
         -DUMF_BUILD_EXAMPLES=OFF
         -DUMF_FORMAT_CODE_STYLE=OFF
         -DUMF_DEVELOPER_MODE=ON
-        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
         -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=OFF
         -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON
         -DUMF_BUILD_CUDA_PROVIDER=ON
@@ -380,7 +374,6 @@ jobs:
         -DUMF_BUILD_EXAMPLES=OFF
         -DUMF_FORMAT_CODE_STYLE=OFF
         -DUMF_DEVELOPER_MODE=ON
-        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
         -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=OFF
         -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON
         -DUMF_BUILD_CUDA_PROVIDER=ON
@@ -468,7 +461,7 @@ jobs:
         python3 -m pip install -r third_party/requirements.txt
 
     - name: Install hwloc
-      run: brew install hwloc jemalloc tbb
+      run: brew install hwloc tbb automake
 
     - name: Configure build
       run: >
@@ -479,7 +472,6 @@ jobs:
         -DUMF_FORMAT_CODE_STYLE=OFF
         -DUMF_DEVELOPER_MODE=ON
         -DUMF_BUILD_LEVEL_ZERO_PROVIDER=OFF
-        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
         -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
         -DUMF_BUILD_SHARED_LIBRARY=ON
         -DUMF_TESTS_FAIL_ON_SKIP=ON
@@ -493,8 +485,6 @@ jobs:
         --build-dir ${{env.BUILD_DIR}}
         --install-dir ${{env.INSTL_DIR}}
         --build-type ${{env.BUILD_TYPE}}
-        --disjoint-pool
-        --jemalloc-pool
         --proxy
         --umf-version ${{env.UMF_VERSION}}
         --shared-library

@@ -16,14 +16,15 @@ set(UMF_CUDA_INCLUDE_DIR
 # TODO: Cleanup the compile definitions across all the CMake files
 set(UMF_COMMON_COMPILE_DEFINITIONS UMF_VERSION=${UMF_VERSION})
 
-add_subdirectory(utils)
-
-set(UMF_LIBS $<BUILD_INTERFACE:umf_utils>)
-
 set(BA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/base_alloc/base_alloc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base_alloc/base_alloc_linear.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base_alloc/base_alloc_global.c)
+
+add_subdirectory(utils)
+add_subdirectory(coarse)
+
+set(UMF_LIBS $<BUILD_INTERFACE:umf_utils> $<BUILD_INTERFACE:coarse>)
 
 if(LINUX)
     set(BA_SOURCES ${BA_SOURCES}
@@ -58,7 +59,6 @@ set(UMF_SOURCES
     memspaces/memspace_highest_bandwidth.c
     memspaces/memspace_lowest_latency.c
     memspaces/memspace_numa.c
-    provider/provider_coarse.c
     provider/provider_cuda.c
     provider/provider_devdax_memory.c
     provider/provider_file_memory.c
@@ -67,8 +67,20 @@ set(UMF_SOURCES
     provider/provider_tracking.c
     critnib/critnib.c
     ravl/ravl.c
+    pool/pool_disjoint.c
+    pool/pool_jemalloc.c
     pool/pool_proxy.c
     pool/pool_scalable.c)
+
+if(UMF_POOL_JEMALLOC_ENABLED)
+    set(UMF_LIBS ${UMF_LIBS} ${JEMALLOC_LIBRARIES})
+    set(UMF_PRIVATE_LIBRARY_DIRS ${UMF_PRIVATE_LIBRARY_DIRS}
+                                 ${JEMALLOC_LIBRARY_DIRS})
+    set(UMF_PRIVATE_INCLUDE_DIRS ${UMF_PRIVATE_INCLUDE_DIRS}
+                                 ${JEMALLOC_INCLUDE_DIRS})
+    set(UMF_COMMON_COMPILE_DEFINITIONS ${UMF_COMMON_COMPILE_DEFINITIONS}
+                                       "UMF_POOL_JEMALLOC_ENABLED=1")
+endif()
 
 if(NOT UMF_DISABLE_HWLOC)
     set(UMF_SOURCES ${UMF_SOURCES} ${HWLOC_DEPENDENT_SOURCES}
@@ -116,6 +128,10 @@ elseif(MACOSX)
 endif()
 
 if(UMF_BUILD_SHARED_LIBRARY)
+    if(UMF_INSTALL_RPATH)
+        set(CMAKE_INSTALL_RPATH "${UMF_INSTALL_RPATH}")
+    endif()
+
     if(NOT UMF_DISABLE_HWLOC)
         set(HWLOC_LIB ${UMF_HWLOC_NAME})
     endif()
@@ -141,13 +157,19 @@ else()
         LIBS ${UMF_LIBS})
 endif()
 
+target_include_directories(umf PRIVATE ${UMF_PRIVATE_INCLUDE_DIRS})
+target_link_directories(umf PRIVATE ${UMF_PRIVATE_LIBRARY_DIRS})
+target_compile_definitions(umf PRIVATE ${UMF_COMMON_COMPILE_DEFINITIONS})
+
+add_dependencies(umf coarse)
+
 if(UMF_LINK_HWLOC_STATICALLY)
     add_dependencies(umf ${UMF_HWLOC_NAME})
 endif()
 
-target_link_directories(umf PRIVATE ${UMF_PRIVATE_LIBRARY_DIRS})
-
-target_compile_definitions(umf PRIVATE ${UMF_COMMON_COMPILE_DEFINITIONS})
+if(NOT WINDOWS AND UMF_POOL_JEMALLOC_ENABLED)
+    add_dependencies(umf jemalloc)
+endif()
 
 if(UMF_BUILD_LEVEL_ZERO_PROVIDER)
     if(LINUX)

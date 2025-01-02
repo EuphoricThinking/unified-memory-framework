@@ -14,6 +14,40 @@
 
 #if defined(UMF_NO_CUDA_PROVIDER)
 
+umf_result_t umfCUDAMemoryProviderParamsCreate(
+    umf_cuda_memory_provider_params_handle_t *hParams) {
+    (void)hParams;
+    return UMF_RESULT_ERROR_NOT_SUPPORTED;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsDestroy(
+    umf_cuda_memory_provider_params_handle_t hParams) {
+    (void)hParams;
+    return UMF_RESULT_ERROR_NOT_SUPPORTED;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetContext(
+    umf_cuda_memory_provider_params_handle_t hParams, void *hContext) {
+    (void)hParams;
+    (void)hContext;
+    return UMF_RESULT_ERROR_NOT_SUPPORTED;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetDevice(
+    umf_cuda_memory_provider_params_handle_t hParams, int hDevice) {
+    (void)hParams;
+    (void)hDevice;
+    return UMF_RESULT_ERROR_NOT_SUPPORTED;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetMemoryType(
+    umf_cuda_memory_provider_params_handle_t hParams,
+    umf_usm_memory_type_t memoryType) {
+    (void)hParams;
+    (void)memoryType;
+    return UMF_RESULT_ERROR_NOT_SUPPORTED;
+}
+
 umf_memory_provider_ops_t *umfCUDAMemoryProviderOps(void) {
     // not supported
     return NULL;
@@ -34,6 +68,7 @@ umf_memory_provider_ops_t *umfCUDAMemoryProviderOps(void) {
 #endif // _MSC_VER
 
 #include "base_alloc_global.h"
+#include "libumf.h"
 #include "utils_assert.h"
 #include "utils_common.h"
 #include "utils_concurrency.h"
@@ -47,6 +82,13 @@ typedef struct cu_memory_provider_t {
     umf_usm_memory_type_t memory_type;
     size_t min_alignment;
 } cu_memory_provider_t;
+
+// CUDA Memory Provider settings struct
+typedef struct umf_cuda_memory_provider_params_t {
+    void *cuda_context_handle;         ///< Handle to the CUDA context
+    int cuda_device_handle;            ///< Handle to the CUDA device
+    umf_usm_memory_type_t memory_type; ///< Allocation memory type
+} umf_cuda_memory_provider_params_t;
 
 typedef struct cu_ops_t {
     CUresult (*cuMemGetAllocationGranularity)(
@@ -158,14 +200,82 @@ static void init_cu_global_state(void) {
     }
 }
 
-static umf_result_t cu_memory_provider_initialize(void *params,
-                                                  void **provider) {
-    if (provider == NULL || params == NULL) {
+umf_result_t umfCUDAMemoryProviderParamsCreate(
+    umf_cuda_memory_provider_params_handle_t *hParams) {
+    libumfInit();
+    if (!hParams) {
+        LOG_ERR("CUDA Memory Provider params handle is NULL");
         return UMF_RESULT_ERROR_INVALID_ARGUMENT;
     }
 
-    cuda_memory_provider_params_t *cu_params =
-        (cuda_memory_provider_params_t *)params;
+    umf_cuda_memory_provider_params_handle_t params_data =
+        umf_ba_global_alloc(sizeof(umf_cuda_memory_provider_params_t));
+    if (!params_data) {
+        LOG_ERR("Cannot allocate memory for CUDA Memory Provider params");
+        return UMF_RESULT_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    params_data->cuda_context_handle = NULL;
+    params_data->cuda_device_handle = -1;
+    params_data->memory_type = UMF_MEMORY_TYPE_UNKNOWN;
+
+    *hParams = params_data;
+
+    return UMF_RESULT_SUCCESS;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsDestroy(
+    umf_cuda_memory_provider_params_handle_t hParams) {
+    umf_ba_global_free(hParams);
+
+    return UMF_RESULT_SUCCESS;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetContext(
+    umf_cuda_memory_provider_params_handle_t hParams, void *hContext) {
+    if (!hParams) {
+        LOG_ERR("CUDA Memory Provider params handle is NULL");
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
+    }
+
+    hParams->cuda_context_handle = hContext;
+
+    return UMF_RESULT_SUCCESS;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetDevice(
+    umf_cuda_memory_provider_params_handle_t hParams, int hDevice) {
+    if (!hParams) {
+        LOG_ERR("CUDA Memory Provider params handle is NULL");
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
+    }
+
+    hParams->cuda_device_handle = hDevice;
+
+    return UMF_RESULT_SUCCESS;
+}
+
+umf_result_t umfCUDAMemoryProviderParamsSetMemoryType(
+    umf_cuda_memory_provider_params_handle_t hParams,
+    umf_usm_memory_type_t memoryType) {
+    if (!hParams) {
+        LOG_ERR("CUDA Memory Provider params handle is NULL");
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
+    }
+
+    hParams->memory_type = memoryType;
+
+    return UMF_RESULT_SUCCESS;
+}
+
+static umf_result_t cu_memory_provider_initialize(void *params,
+                                                  void **provider) {
+    if (params == NULL) {
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
+    }
+
+    umf_cuda_memory_provider_params_handle_t cu_params =
+        (umf_cuda_memory_provider_params_handle_t)params;
 
     if (cu_params->memory_type == UMF_MEMORY_TYPE_UNKNOWN ||
         cu_params->memory_type > UMF_MEMORY_TYPE_SHARED) {
@@ -214,15 +324,10 @@ static umf_result_t cu_memory_provider_initialize(void *params,
 }
 
 static void cu_memory_provider_finalize(void *provider) {
-    if (provider == NULL) {
-        ASSERT(0);
-        return;
-    }
-
     umf_ba_global_free(provider);
 }
 
-/* 
+/*
  * This function is used by the CUDA provider to make sure that
  * the required context is set. If the current context is
  * not the required one, it will be saved in restore_ctx.
@@ -250,10 +355,6 @@ static inline umf_result_t set_context(CUcontext required_ctx,
 static umf_result_t cu_memory_provider_alloc(void *provider, size_t size,
                                              size_t alignment,
                                              void **resultPtr) {
-    if (provider == NULL || resultPtr == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
     cu_memory_provider_t *cu_provider = (cu_memory_provider_t *)provider;
 
     if (alignment > cu_provider->min_alignment) {
@@ -318,10 +419,6 @@ static umf_result_t cu_memory_provider_free(void *provider, void *ptr,
                                             size_t bytes) {
     (void)bytes;
 
-    if (provider == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
     if (ptr == NULL) {
         return UMF_RESULT_SUCCESS;
     }
@@ -385,10 +482,6 @@ static umf_result_t cu_memory_provider_get_min_page_size(void *provider,
                                                          size_t *pageSize) {
     (void)ptr;
 
-    if (provider == NULL || pageSize == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
     cu_memory_provider_t *cu_provider = (cu_memory_provider_t *)provider;
 
     CUmemAllocationProp allocProps = {0};
@@ -406,10 +499,6 @@ static umf_result_t
 cu_memory_provider_get_recommended_page_size(void *provider, size_t size,
                                              size_t *pageSize) {
     (void)size;
-
-    if (provider == NULL || pageSize == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
 
     cu_memory_provider_t *cu_provider = (cu_memory_provider_t *)provider;
 
@@ -431,10 +520,7 @@ static const char *cu_memory_provider_get_name(void *provider) {
 
 static umf_result_t cu_memory_provider_get_ipc_handle_size(void *provider,
                                                            size_t *size) {
-    if (provider == NULL || size == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
+    (void)provider;
     *size = sizeof(cu_ipc_data_t);
     return UMF_RESULT_SUCCESS;
 }
@@ -443,11 +529,8 @@ static umf_result_t cu_memory_provider_get_ipc_handle(void *provider,
                                                       const void *ptr,
                                                       size_t size,
                                                       void *providerIpcData) {
+    (void)provider;
     (void)size;
-
-    if (provider == NULL || ptr == NULL || providerIpcData == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
 
     CUresult cu_result;
     cu_ipc_data_t *cu_ipc_data = (cu_ipc_data_t *)providerIpcData;
@@ -463,20 +546,14 @@ static umf_result_t cu_memory_provider_get_ipc_handle(void *provider,
 
 static umf_result_t cu_memory_provider_put_ipc_handle(void *provider,
                                                       void *providerIpcData) {
-    if (provider == NULL || providerIpcData == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
+    (void)provider;
+    (void)providerIpcData;
     return UMF_RESULT_SUCCESS;
 }
 
 static umf_result_t cu_memory_provider_open_ipc_handle(void *provider,
                                                        void *providerIpcData,
                                                        void **ptr) {
-    if (provider == NULL || ptr == NULL || providerIpcData == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
-
     cu_memory_provider_t *cu_provider = (cu_memory_provider_t *)provider;
 
     CUresult cu_result;
@@ -503,11 +580,8 @@ static umf_result_t cu_memory_provider_open_ipc_handle(void *provider,
 
 static umf_result_t
 cu_memory_provider_close_ipc_handle(void *provider, void *ptr, size_t size) {
+    (void)provider;
     (void)size;
-
-    if (provider == NULL || ptr == NULL) {
-        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
-    }
 
     CUresult cu_result;
 
@@ -525,11 +599,11 @@ static struct umf_memory_provider_ops_t UMF_CUDA_MEMORY_PROVIDER_OPS = {
     .initialize = cu_memory_provider_initialize,
     .finalize = cu_memory_provider_finalize,
     .alloc = cu_memory_provider_alloc,
+    .free = cu_memory_provider_free,
     .get_last_native_error = cu_memory_provider_get_last_native_error,
     .get_recommended_page_size = cu_memory_provider_get_recommended_page_size,
     .get_min_page_size = cu_memory_provider_get_min_page_size,
     .get_name = cu_memory_provider_get_name,
-    .ext.free = cu_memory_provider_free,
     // TODO
     /*
     .ext.purge_lazy = cu_memory_provider_purge_lazy,

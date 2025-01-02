@@ -9,12 +9,25 @@
 #include "poolFixtures.hpp"
 #include "provider.hpp"
 
-auto defaultParams = umfOsMemoryProviderParamsDefault();
+using os_params_unique_handle_t =
+    std::unique_ptr<umf_os_memory_provider_params_t,
+                    decltype(&umfOsMemoryProviderParamsDestroy)>;
+
+os_params_unique_handle_t createOsMemoryProviderParams() {
+    umf_os_memory_provider_params_handle_t params = nullptr;
+    umf_result_t res = umfOsMemoryProviderParamsCreate(&params);
+    if (res != UMF_RESULT_SUCCESS) {
+        throw std::runtime_error("Failed to create os memory provider params");
+    }
+
+    return os_params_unique_handle_t(params, &umfOsMemoryProviderParamsDestroy);
+}
+auto defaultParams = createOsMemoryProviderParams();
+
 INSTANTIATE_TEST_SUITE_P(scalablePoolTest, umfPoolTest,
                          ::testing::Values(poolCreateExtParams{
                              umfScalablePoolOps(), nullptr,
-                             umfOsMemoryProviderOps(), &defaultParams,
-                             nullptr}));
+                             umfOsMemoryProviderOps(), defaultParams.get()}));
 
 using scalablePoolParams = std::tuple<size_t, bool>;
 struct umfScalablePoolParamsTest
@@ -29,16 +42,16 @@ struct umfScalablePoolParamsTest
     struct provider_validator : public umf_test::provider_ba_global {
         using base_provider = umf_test::provider_ba_global;
 
-        umf_result_t initialize(validation_params_t *params) noexcept {
+        umf_result_t initialize(validation_params_t *params) {
             EXPECT_NE(params, nullptr);
             expected_params = params;
             return UMF_RESULT_SUCCESS;
         }
-        umf_result_t alloc(size_t size, size_t align, void **ptr) noexcept {
+        umf_result_t alloc(size_t size, size_t align, void **ptr) {
             EXPECT_EQ(size, expected_params->granularity);
             return base_provider::alloc(size, align, ptr);
         }
-        umf_result_t free(void *ptr, size_t size) noexcept {
+        umf_result_t free(void *ptr, size_t size) {
             EXPECT_EQ(expected_params->keep_all_memory, false);
             return base_provider::free(ptr, size);
         }
@@ -49,7 +62,7 @@ struct umfScalablePoolParamsTest
     static constexpr umf_memory_provider_ops_t VALIDATOR_PROVIDER_OPS =
         umf::providerMakeCOps<provider_validator, validation_params_t>();
 
-    umfScalablePoolParamsTest() {}
+    umfScalablePoolParamsTest() : expected_params{0, false}, params(nullptr) {}
     void SetUp() override {
         test::SetUp();
         auto [granularity, keep_all_memory] = this->GetParam();

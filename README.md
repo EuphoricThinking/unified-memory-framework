@@ -37,7 +37,11 @@ For development and contributions:
 - cmake-format-0.6 (can be installed with `python -m pip install cmake-format==0.6.13`)
 - black (can be installed with `python -m pip install black==24.3.0`)
 
+<<<<<<< HEAD
 For building tests, multithreaded benchmarks:
+=======
+For building tests and multithreaded benchmarks:
+>>>>>>> e8bc871cd537cb0b2d77812a7e40c6cff3e19720
 - C++ compiler with C++17 support
 
 For Level Zero memory provider tests:
@@ -100,7 +104,10 @@ List of options provided by CMake:
 | UMF_BUILD_SHARED_LIBRARY | Build UMF as shared library | ON/OFF | OFF |
 | UMF_BUILD_LEVEL_ZERO_PROVIDER | Build Level Zero memory provider | ON/OFF | ON |
 | UMF_BUILD_CUDA_PROVIDER | Build CUDA memory provider | ON/OFF | ON |
+<<<<<<< HEAD
 | UMF_BUILD_LIBUMF_POOL_DISJOINT | Build the libumf_pool_disjoint static library | ON/OFF | ON |
+=======
+>>>>>>> e8bc871cd537cb0b2d77812a7e40c6cff3e19720
 | UMF_BUILD_LIBUMF_POOL_JEMALLOC | Build the libumf_pool_jemalloc static library | ON/OFF | OFF |
 | UMF_BUILD_TESTS | Build UMF tests | ON/OFF | ON |
 | UMF_BUILD_GPU_TESTS | Build UMF GPU tests | ON/OFF | OFF |
@@ -117,7 +124,7 @@ List of options provided by CMake:
 | UMF_USE_MSAN | Enable MemorySanitizer checks | ON/OFF | OFF |
 | UMF_USE_VALGRIND | Enable Valgrind instrumentation | ON/OFF | OFF |
 | UMF_USE_COVERAGE | Build with coverage enabled (Linux only) | ON/OFF | OFF |
-| UMF_LINK_HWLOC_STATICALLY | Link UMF with HWLOC library statically (Windows+Release only) | ON/OFF | OFF |
+| UMF_LINK_HWLOC_STATICALLY | Link UMF with HWLOC library statically (proxy library will be disabled on Windows+Debug build) | ON/OFF | OFF |
 | UMF_DISABLE_HWLOC | Disable features that requires hwloc (OS provider, memory targets, topology discovery) | ON/OFF | OFF |
 
 ## Architecture: memory pools and providers
@@ -150,6 +157,15 @@ OS memory provider supports two types of memory mappings (set by the `visibility
 IPC API requires the `UMF_MEM_MAP_SHARED` memory `visibility` mode
 (`UMF_RESULT_ERROR_INVALID_ARGUMENT` is returned otherwise).
 
+IPC API uses the file descriptor duplication. It requires using `pidfd_getfd(2)` to obtain
+a duplicate of another process's file descriptor (`pidfd_getfd(2)` is supported since Linux 5.6).
+Permission to duplicate another process's file descriptor is governed by a ptrace access mode
+`PTRACE_MODE_ATTACH_REALCREDS` check (see `ptrace(2)`) that can be changed using
+the `/proc/sys/kernel/yama/ptrace_scope` interface in the following way:
+```sh
+$ sudo bash -c "echo 0 > /proc/sys/kernel/yama/ptrace_scope"
+```
+
 There are available two mechanisms for the shared memory mapping:
 1) a named shared memory object (used if the `shm_name` parameter is not NULL) or
 2) an anonymous file descriptor (used if the `shm_name` parameter is NULL)
@@ -162,35 +178,43 @@ An anonymous file descriptor for the shared memory mapping will be created using
 
 ##### Requirements
 
-Required packages for tests (Linux-only yet):
+IPC API on Linux requires the `PTRACE_MODE_ATTACH_REALCREDS` permission (see `ptrace(2)`)
+to duplicate another process's file descriptor (see above).
+
+Packages required for tests (Linux-only yet):
    - libnuma-dev
 
 #### Level Zero memory provider
 
 A memory provider that provides memory from L0 device.
 
+IPC API uses the file descriptor duplication. It requires using `pidfd_getfd(2)` to obtain
+a duplicate of another process's file descriptor (`pidfd_getfd(2)` is supported since Linux 5.6).
+Permission to duplicate another process's file descriptor is governed by a ptrace access mode
+`PTRACE_MODE_ATTACH_REALCREDS` check (see `ptrace(2)`) that can be changed using
+the `/proc/sys/kernel/yama/ptrace_scope` interface in the following way:
+```sh
+$ sudo bash -c "echo 0 > /proc/sys/kernel/yama/ptrace_scope"
+```
+
 ##### Requirements
 
 1) Linux or Windows OS
 2) The `UMF_BUILD_LEVEL_ZERO_PROVIDER` option turned `ON` (by default)
+3) IPC API on Linux requires the `PTRACE_MODE_ATTACH_REALCREDS` permission (see `ptrace(2)`)
+   to duplicate another process's file descriptor (see above).
 
 Additionally, required for tests:
 
-3) The `UMF_BUILD_GPU_TESTS` option turned `ON`
-4) System with Level Zero compatible GPU
-5) Required packages:
+4) The `UMF_BUILD_GPU_TESTS` option turned `ON`
+5) System with Level Zero compatible GPU
+6) Required packages:
    - liblevel-zero-dev (Linux) or level-zero-sdk (Windows)
 
 #### DevDax memory provider (Linux only)
 
 A memory provider that provides memory from a device DAX (a character device file /dev/daxX.Y).
 It can be used when large memory mappings are needed.
-
-The DevDax memory provider does not support the free operation
-(`umfMemoryProviderFree()` always returns `UMF_RESULT_ERROR_NOT_SUPPORTED`),
-so it should be used with a pool manager that will take over
-the managing of the provided memory - for example the jemalloc pool
-with the `disable_provider_free` parameter set to true.
 
 ##### Requirements
 
@@ -200,12 +224,6 @@ with the `disable_provider_free` parameter set to true.
 #### File memory provider (Linux only yet)
 
 A memory provider that provides memory by mapping a regular, extendable file.
-
-The file memory provider does not support the free operation
-(`umfMemoryProviderFree()` always returns `UMF_RESULT_ERROR_NOT_SUPPORTED`),
-so it should be used with a pool manager that will take over
-the managing of the provided memory - for example the jemalloc pool
-with the `disable_provider_free` parameter set to true.
 
 IPC API requires the `UMF_MEM_MAP_SHARED` memory `visibility` mode
 (`UMF_RESULT_ERROR_INVALID_ARGUMENT` is returned otherwise).
@@ -247,10 +265,6 @@ To enable this feature, the `UMF_BUILD_SHARED_LIBRARY` option needs to be turned
 
 TODO: Add a description
 
-##### Requirements
-
-To enable this feature, the `UMF_BUILD_LIBUMF_POOL_DISJOINT` option needs to be turned `ON`.
-
 #### Jemalloc pool
 
 Jemalloc pool is a [jemalloc](https://github.com/jemalloc/jemalloc)-based memory 
@@ -258,11 +272,26 @@ pool manager built as a separate static library: libjemalloc_pool.a on Linux and
 jemalloc_pool.lib on Windows.
 The `UMF_BUILD_LIBUMF_POOL_JEMALLOC` option has to be turned `ON` to build this library.
 
+[jemalloc](https://github.com/jemalloc/jemalloc) is required to build the jemalloc pool.
+
+In case of Linux OS jemalloc is built from the (fetched) sources with the following
+non-default options enabled:
+- `--with-jemalloc-prefix=je_` - adds the `je_` prefix to all public APIs,
+- `--disable-cxx` - disables C++ integration, it will cause the `new` and the `delete`
+                    operators implementations to be omitted.
+- `--disable-initial-exec-tls` - disables the initial-exec TLS model for jemalloc's
+                    internal thread-local storage (on those platforms that support
+                    explicit settings), it can allow jemalloc to be dynamically
+                    loaded after program startup (e.g. using `dlopen()`).
+
+The default jemalloc package is required on Windows.
+
 ##### Requirements
 
 1) The `UMF_BUILD_LIBUMF_POOL_JEMALLOC` option turned `ON`
-2) Required packages:
-   - libjemalloc-dev (Linux) or jemalloc (Windows)
+2) jemalloc is required:
+- on Linux and MacOS: jemalloc is fetched and built from sources (a custom build),
+- on Windows: the default jemalloc package is required
 
 #### Scalable Pool (part of libumf)
 
@@ -316,6 +345,13 @@ The memory used by the proxy memory allocator is mmap'ed:
 2) with the `MAP_SHARED` flag if the `UMF_PROXY` environment variable contains one of two following strings: `page.disposition=shared-shm` or `page.disposition=shared-fd`. These two options differ in a mechanism used during IPC:
    - `page.disposition=shared-shm` - IPC uses the named shared memory. An SHM name is generated using the `umf_proxy_lib_shm_pid_$PID` pattern, where `$PID` is the PID of the process. It creates the `/dev/shm/umf_proxy_lib_shm_pid_$PID` file.
    - `page.disposition=shared-fd` - IPC uses the file descriptor duplication. It requires using `pidfd_getfd(2)` to obtain a duplicate of another process's file descriptor. Permission to duplicate another process's file descriptor is governed by a ptrace access mode `PTRACE_MODE_ATTACH_REALCREDS` check (see `ptrace(2)`) that can be changed using the `/proc/sys/kernel/yama/ptrace_scope` interface. `pidfd_getfd(2)` is supported since Linux 5.6.
+
+**Size threshold**
+
+The **size threshold** feature (Linux only) causes that all allocations of size less than the given threshold value go to the default system allocator instead of the proxy library.
+It can be enabled by adding the `size.threshold=<value>` string to the `UMF_PROXY` environment variable (with `';'` as a separator), for example: `UMF_PROXY="page.disposition=shared-shm;size.threshold=64"`.
+
+**Remark:** changing a size of allocation (using `realloc()` ) does not change the allocator (`realloc(malloc(threshold - 1), threshold + 1)` still belongs to the default system allocator and `realloc(malloc(threshold + 1), threshold - 1)` still belongs to the proxy library pool allocator).
 
 #### Windows
 

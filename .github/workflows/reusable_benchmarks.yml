@@ -34,7 +34,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libhwloc-dev libnuma-dev libjemalloc-dev libtbb-dev
+          sudo apt-get install -y cmake libhwloc-dev libnuma-dev libtbb-dev
 
       - name: Initialize vcpkg
         if: matrix.os == 'windows-latest'
@@ -64,7 +64,6 @@ jobs:
           -DUMF_DEVELOPER_MODE=OFF
           -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON
           -DUMF_BUILD_CUDA_PROVIDER=ON
-          -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
           -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
 
       - name: Build UMF on Linux

@@ -14,15 +14,46 @@ EXPORTS
     umfTearDown
     umfGetCurrentVersion
     umfCloseIPCHandle
-    umfCoarseMemoryProviderGetStats
-    umfCoarseMemoryProviderOps
     umfCUDAMemoryProviderOps
+    umfCUDAMemoryProviderParamsCreate
+    umfCUDAMemoryProviderParamsDestroy
+    umfCUDAMemoryProviderParamsSetContext
+    umfCUDAMemoryProviderParamsSetDevice
+    umfCUDAMemoryProviderParamsSetMemoryType
     umfDevDaxMemoryProviderOps
+    umfDevDaxMemoryProviderParamsCreate
+    umfDevDaxMemoryProviderParamsDestroy
+    umfDevDaxMemoryProviderParamsSetDeviceDax
+    umfDevDaxMemoryProviderParamsSetProtection
+    umfDisjointPoolOps
+    umfDisjointPoolParamsCreate
+    umfDisjointPoolParamsDestroy
+    umfDisjointPoolParamsSetCapacity
+    umfDisjointPoolParamsSetMaxPoolableSize
+    umfDisjointPoolParamsSetMinBucketSize
+    umfDisjointPoolParamsSetName
+    umfDisjointPoolParamsSetSharedLimits
+    umfDisjointPoolParamsSetSlabMinSize
+    umfDisjointPoolParamsSetTrace
+    umfDisjointPoolSharedLimitsCreate
+    umfDisjointPoolSharedLimitsDestroy
     umfFree
     umfFileMemoryProviderOps
+    umfFileMemoryProviderParamsCreate
+    umfFileMemoryProviderParamsDestroy
+    umfFileMemoryProviderParamsSetPath
+    umfFileMemoryProviderParamsSetProtection
+    umfFileMemoryProviderParamsSetVisibility
     umfGetIPCHandle
     umfGetLastFailedMemoryProvider
+    umfJemallocPoolOps
     umfLevelZeroMemoryProviderOps
+    umfLevelZeroMemoryProviderParamsCreate
+    umfLevelZeroMemoryProviderParamsDestroy
+    umfLevelZeroMemoryProviderParamsSetContext
+    umfLevelZeroMemoryProviderParamsSetDevice
+    umfLevelZeroMemoryProviderParamsSetMemoryType
+    umfLevelZeroMemoryProviderParamsSetResidentDevices
     umfMemoryProviderAlloc
     umfMemoryProviderAllocationMerge
     umfMemoryProviderAllocationSplit
@@ -66,6 +97,15 @@ EXPORTS
     umfMemtargetGetType
     umfOpenIPCHandle
     umfOsMemoryProviderOps
+    umfOsMemoryProviderParamsCreate
+    umfOsMemoryProviderParamsDestroy
+    umfOsMemoryProviderParamsSetProtection
+    umfOsMemoryProviderParamsSetVisibility
+    umfOsMemoryProviderParamsSetShmName
+    umfOsMemoryProviderParamsSetNumaList
+    umfOsMemoryProviderParamsSetNumaMode
+    umfOsMemoryProviderParamsSetPartSize
+    umfOsMemoryProviderParamsSetPartitions
     umfPoolAlignedMalloc
     umfPoolByPtr
     umfPoolCalloc
@@ -73,12 +113,15 @@ EXPORTS
     umfPoolCreateFromMemspace
     umfPoolDestroy
     umfPoolFree
+    umfPoolGetIPCHandler
     umfPoolGetIPCHandleSize
     umfPoolGetLastAllocationError
+    umfPoolGetTag
     umfPoolGetMemoryProvider
     umfPoolMalloc
     umfPoolMallocUsableSize
     umfPoolRealloc
+    umfPoolSetTag
     umfProxyPoolOps
     umfPutIPCHandle
     umfScalablePoolOps

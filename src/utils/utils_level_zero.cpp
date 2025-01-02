@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "level_zero_helpers.h"
+#include "utils_level_zero.h"
 
 #include <memory>
 #include <stdlib.h>
@@ -63,9 +63,68 @@ struct libze_ops {
 } libze_ops;
 
 #if USE_DLOPEN
+// Generic no-op stub function for all callbacks
+template <typename... Args> ze_result_t noop_stub(Args &&...) {
+    return ZE_RESULT_SUCCESS; // Always return ZE_RESULT_SUCCESS
+}
+
 struct DlHandleCloser {
     void operator()(void *dlHandle) {
         if (dlHandle) {
+            // Reset all function pointers to no-op stubs in case the library
+            // but some other global object still try to call Level Zero functions.
+            libze_ops.zeInit = [](auto... args) { return noop_stub(args...); };
+            libze_ops.zeDriverGet = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeDeviceGet = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeDeviceGetProperties = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeContextCreate = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeContextDestroy = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandQueueCreate = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandQueueDestroy = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandQueueExecuteCommandLists = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandQueueSynchronize = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandListCreate = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandListDestroy = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandListClose = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandListAppendMemoryCopy = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeCommandListAppendMemoryFill = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeMemGetAllocProperties = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeMemAllocDevice = [](auto... args) {
+                return noop_stub(args...);
+            };
+            libze_ops.zeMemFree = [](auto... args) {
+                return noop_stub(args...);
+            };
             utils_close_library(dlHandle);
         }
     }
@@ -238,7 +297,7 @@ int InitLevelZeroOps() {
 }
 #endif // USE_DLOPEN
 
-static int init_level_zero_lib(void) {
+static int utils_ze_init_level_zero_lib(void) {
     ze_init_flag_t flags = ZE_INIT_FLAG_GPU_ONLY;
     ze_result_t result = libze_ops.zeInit(flags);
     if (result != ZE_RESULT_SUCCESS) {
@@ -247,11 +306,35 @@ static int init_level_zero_lib(void) {
     return 0;
 }
 
-int get_drivers(uint32_t *drivers_num_, ze_driver_handle_t **drivers_) {
+static UTIL_ONCE_FLAG level_zero_init_flag = UTIL_ONCE_FLAG_INIT;
+static int InitResult;
+
+static void utils_ze_init_level_zero_once(void) {
+    InitResult = InitLevelZeroOps();
+    if (InitResult != 0) {
+        return;
+    }
+    InitResult = utils_ze_init_level_zero_lib();
+}
+
+int utils_ze_init_level_zero(void) {
+    utils_init_once(&level_zero_init_flag, utils_ze_init_level_zero_once);
+
+    return InitResult;
+}
+
+int utils_ze_get_drivers(uint32_t *drivers_num_,
+                         ze_driver_handle_t **drivers_) {
     int ret = 0;
     ze_result_t ze_result;
     ze_driver_handle_t *drivers = NULL;
     uint32_t drivers_num = 0;
+
+    ret = utils_ze_init_level_zero();
+    if (ret != 0) {
+        fprintf(stderr, "utils_ze_init_level_zero() failed!\n");
+        goto init_fail;
+    }
 
     ze_result = libze_ops.zeDriverGet(&drivers_num, NULL);
     if (ze_result != ZE_RESULT_SUCCESS) {
@@ -288,15 +371,23 @@ fn_fail:
         free(drivers);
         *drivers_ = NULL;
     }
+
+init_fail:
     return ret;
 }
 
-int get_devices(ze_driver_handle_t driver, uint32_t *devices_num_,
-                ze_device_handle_t **devices_) {
+int utils_ze_get_devices(ze_driver_handle_t driver, uint32_t *devices_num_,
+                         ze_device_handle_t **devices_) {
     ze_result_t ze_result;
     int ret = 0;
     uint32_t devices_num = 0;
     ze_device_handle_t *devices = NULL;
+
+    ret = utils_ze_init_level_zero();
+    if (ret != 0) {
+        fprintf(stderr, "utils_ze_init_level_zero() failed!\n");
+        goto init_fail;
+    }
 
     ze_result = libze_ops.zeDeviceGet(driver, &devices_num, NULL);
     if (ze_result != ZE_RESULT_SUCCESS) {
@@ -333,10 +424,12 @@ fn_fail:
         free(devices);
         devices = NULL;
     }
+init_fail:
     return ret;
 }
 
-int find_driver_with_gpu(uint32_t *driver_idx, ze_driver_handle_t *driver_) {
+int utils_ze_find_driver_with_gpu(uint32_t *driver_idx,
+                                  ze_driver_handle_t *driver_) {
     int ret = 0;
     ze_result_t ze_result;
     uint32_t drivers_num = 0;
@@ -344,7 +437,7 @@ int find_driver_with_gpu(uint32_t *driver_idx, ze_driver_handle_t *driver_) {
     ze_driver_handle_t *drivers = NULL;
     ze_driver_handle_t driver_with_gpus = NULL;
 
-    ret = get_drivers(&drivers_num, &drivers);
+    ret = utils_ze_get_drivers(&drivers_num, &drivers);
     if (ret) {
         goto fn_fail;
     }
@@ -354,7 +447,7 @@ int find_driver_with_gpu(uint32_t *driver_idx, ze_driver_handle_t *driver_) {
         uint32_t devices_num = 0;
         ze_driver_handle_t driver = drivers[i];
 
-        ret = get_devices(driver, &devices_num, &devices);
+        ret = utils_ze_get_devices(driver, &devices_num, &devices);
         if (ret) {
             goto fn_fail;
         }
@@ -403,13 +496,14 @@ fn_exit:
     return ret;
 }
 
-int find_gpu_device(ze_driver_handle_t driver, ze_device_handle_t *device_) {
+int utils_ze_find_gpu_device(ze_driver_handle_t driver,
+                             ze_device_handle_t *device_) {
     int ret = -1;
     uint32_t devices_num = 0;
     ze_device_handle_t *devices = NULL;
     ze_device_handle_t device;
 
-    ret = get_devices(driver, &devices_num, &devices);
+    ret = utils_ze_get_devices(driver, &devices_num, &devices);
     if (ret) {
         return ret;
     }
@@ -441,9 +535,9 @@ int find_gpu_device(ze_driver_handle_t driver, ze_device_handle_t *device_) {
     return ret;
 }
 
-int level_zero_fill(ze_context_handle_t context, ze_device_handle_t device,
-                    void *ptr, size_t size, const void *pattern,
-                    size_t pattern_size) {
+int utils_ze_level_zero_fill(ze_context_handle_t context,
+                             ze_device_handle_t device, void *ptr, size_t size,
+                             const void *pattern, size_t pattern_size) {
     int ret = 0;
 
     ze_command_queue_desc_t commandQueueDesc = {
@@ -527,8 +621,9 @@ err_queue_destroy:
     return ret;
 }
 
-int level_zero_copy(ze_context_handle_t context, ze_device_handle_t device,
-                    void *dst_ptr, const void *src_ptr, size_t size) {
+int utils_ze_level_zero_copy(ze_context_handle_t context,
+                             ze_device_handle_t device, void *dst_ptr,
+                             const void *src_ptr, size_t size) {
     int ret = 0;
     ze_command_queue_desc_t commandQueueDesc = {
         ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
@@ -610,7 +705,8 @@ err_queue_destroy:
     return ret;
 }
 
-int create_context(ze_driver_handle_t driver, ze_context_handle_t *context) {
+int utils_ze_create_context(ze_driver_handle_t driver,
+                            ze_context_handle_t *context) {
     ze_result_t ze_result;
     ze_context_desc_t ctxtDesc;
     ctxtDesc.stype = ZE_STRUCTURE_TYPE_CONTEXT_DESC;
@@ -626,7 +722,7 @@ int create_context(ze_driver_handle_t driver, ze_context_handle_t *context) {
     return 0;
 }
 
-int destroy_context(ze_context_handle_t context) {
+int utils_ze_destroy_context(ze_context_handle_t context) {
     ze_result_t ze_result;
     ze_result = libze_ops.zeContextDestroy(context);
     if (ze_result != ZE_RESULT_SUCCESS) {
@@ -637,7 +733,7 @@ int destroy_context(ze_context_handle_t context) {
     return 0;
 }
 
-ze_memory_type_t get_mem_type(ze_context_handle_t context, void *ptr) {
+ze_memory_type_t utils_ze_get_mem_type(ze_context_handle_t context, void *ptr) {
     ze_device_handle_t device = NULL;
     ze_memory_allocation_properties_t alloc_props;
     alloc_props.stype = ZE_STRUCTURE_TYPE_MEMORY_ALLOCATION_PROPERTIES;
@@ -648,67 +744,4 @@ ze_memory_type_t get_mem_type(ze_context_handle_t context, void *ptr) {
 
     libze_ops.zeMemGetAllocProperties(context, ptr, &alloc_props, &device);
     return alloc_props.type;
-}
-
-UTIL_ONCE_FLAG level_zero_init_flag;
-int InitResult;
-void init_level_zero_once() {
-    InitResult = InitLevelZeroOps();
-    if (InitResult != 0) {
-        return;
-    }
-    InitResult = init_level_zero_lib();
-}
-
-int init_level_zero() {
-    utils_init_once(&level_zero_init_flag, init_level_zero_once);
-
-    return InitResult;
-}
-
-level_zero_memory_provider_params_t
-create_level_zero_prov_params(umf_usm_memory_type_t memory_type) {
-    level_zero_memory_provider_params_t params = {
-        NULL, NULL, UMF_MEMORY_TYPE_UNKNOWN, NULL, 0};
-    uint32_t driver_idx = 0;
-    ze_driver_handle_t hDriver;
-    ze_device_handle_t hDevice;
-    ze_context_handle_t hContext;
-    int ret = -1;
-
-    ret = init_level_zero();
-    if (ret != 0) {
-        // Return empty params. Test will be skipped.
-        return params;
-    }
-
-    ret = find_driver_with_gpu(&driver_idx, &hDriver);
-    if (ret != 0 || hDriver == NULL) {
-        // Return empty params. Test will be skipped.
-        return params;
-    }
-
-    ret = find_gpu_device(hDriver, &hDevice);
-    if (ret != 0 || hDevice == NULL) {
-        // Return empty params. Test will be skipped.
-        return params;
-    }
-
-    ret = create_context(hDriver, &hContext);
-    if (ret != 0) {
-        // Return empty params. Test will be skipped.
-        return params;
-    }
-
-    params.level_zero_context_handle = hContext;
-
-    if (memory_type == UMF_MEMORY_TYPE_HOST) {
-        params.level_zero_device_handle = NULL;
-    } else {
-        params.level_zero_device_handle = hDevice;
-    }
-
-    params.memory_type = memory_type;
-
-    return params;
 }

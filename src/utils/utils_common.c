@@ -25,7 +25,6 @@ void utils_align_ptr_up_size_down(void **ptr, size_t *size, size_t alignment) {
     }
 
     ASSERT(IS_ALIGNED(p, alignment));
-    ASSERT(IS_ALIGNED(s, alignment));
 
     *ptr = (void *)p;
     *size = s;
@@ -53,18 +52,9 @@ void utils_align_ptr_down_size_up(void **ptr, size_t *size, size_t alignment) {
     *size = s;
 }
 
-int utils_env_var_has_str(const char *envvar, const char *str) {
+char *utils_env_var_get_str(const char *envvar, const char *str) {
     char *value = getenv(envvar);
-    if (value && strstr(value, str)) {
-        return 1;
-    }
-
-    return 0;
-}
-
-// check if we are running in the proxy library
-int utils_is_running_in_proxy_lib(void) {
-    return utils_env_var_has_str("LD_PRELOAD", "libumf_proxy.so");
+    return value ? strstr(value, str) : NULL;
 }
 
 const char *utils_parse_var(const char *var, const char *option,

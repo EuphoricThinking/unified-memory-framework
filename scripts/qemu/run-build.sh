@@ -14,18 +14,18 @@ pwd
 
 echo password | sudo -Sk apt-get update
 echo password | sudo -Sk apt-get install -y git cmake gcc g++ pkg-config \
-    numactl libnuma-dev hwloc libhwloc-dev libjemalloc-dev libtbb-dev valgrind lcov
+    numactl libnuma-dev hwloc libhwloc-dev libtbb-dev valgrind lcov
 
 mkdir build
 cd build
 
 cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
+    -DUMF_QEMU_BUILD=1 \
     -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON \
     -DUMF_BUILD_CUDA_PROVIDER=ON \
     -DUMF_FORMAT_CODE_STYLE=OFF \
     -DUMF_DEVELOPER_MODE=ON \
-    -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON \
     -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON \
     -DUMF_BUILD_EXAMPLES=ON \
     -DUMF_USE_COVERAGE=${COVERAGE} \
