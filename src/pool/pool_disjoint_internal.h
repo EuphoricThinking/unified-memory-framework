@@ -44,7 +44,7 @@ typedef struct bucket_t {
     slab_list_item_t *available_slabs;
     size_t available_slabs_num;
 
-    // Linked list of slabs with 0 available chunk.
+    // Linked list of slabs with 0 available chunks.
     slab_list_item_t *unavailable_slabs;
 
     // Protects the bucket and all the corresponding slabs
@@ -58,10 +58,10 @@ typedef struct bucket_t {
 
     // For buckets used in chunked mode, a counter of slabs in the pool.
     // For allocations that use an entire slab each, the entries in the Available
-    // list are entries in the pool.Each slab is available for a new
-    // allocation.The size of the Available list is the size of the pool.
+    // list are entries in the pool. Each slab is available for a new
+    // allocation. The size of the Available list is the size of the pool.
     // For allocations that use slabs in chunked mode, slabs will be in the
-    // Available list if any one or more of their chunks is free.The entire slab
+    // Available list if any one or more of their chunks is free. The entire slab
     // is not necessarily free, just some chunks in the slab are free. To
     // implement pooling we will allow one slab in the Available list to be
     // entirely empty. Normally such a slab would have been freed. But
@@ -69,7 +69,7 @@ typedef struct bucket_t {
     // When a slab becomes entirely free we have to decide whether to return it
     // to the provider or keep it allocated. A simple check for size of the
     // Available list is not sufficient to check whether any slab has been
-    // pooled yet.We would have to traverse the entire Available listand check
+    // pooled yet. We would have to traverse the entire Available list and check
     // if any of them is entirely free. Instead we keep a counter of entirely
     // empty slabs within the Available list to speed up the process of checking
     // if a slab in this bucket is already pooled.
@@ -87,7 +87,7 @@ typedef struct bucket_t {
 
 // Represents the allocated memory block of size 'slab_min_size'
 // Internally, it splits the memory block into chunks. The number of
-// chunks depends of the size of a Bucket which created the Slab.
+// chunks depends on the size of a Bucket which created the Slab.
 // Note: Bucket's methods are responsible for thread safety of Slab access,
 // so no locking happens here.
 typedef struct slab_t {
@@ -96,7 +96,7 @@ typedef struct slab_t {
     size_t slab_size;
 
     // Represents the current state of each chunk: if the bit is set then the
-    // chunk is allocated, and if the chunk is free for allocation otherwise
+    // TODO https://github.com/oneapi-src/unified-memory-framework/pull/898#discussion_r1886324463 chunk is allocated, and if the chunk is free for allocation otherwise
     bool *chunks;
     size_t num_chunks;
 

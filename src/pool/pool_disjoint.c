@@ -89,7 +89,7 @@ slab_t *create_slab(bucket_t *bucket, bool full_size) {
         }
         memset(slab->chunks, 0, sizeof(bool) * slab->num_chunks);
     }
-    // in case bucket size is not a multiple of slab_min_size, we would have
+    // //TODO https://github.com/oneapi-src/unified-memory-framework/pull/898#discussion_r1886352692 in case bucket size is not a multiple of slab_min_size, we would have
     // some padding at the end of the slab
     slab->slab_size = bucket_slab_alloc_size(bucket);
 
@@ -149,7 +149,7 @@ size_t slab_find_first_available_chunk_idx(const slab_t *slab) {
 }
 
 void *slab_get_chunk(slab_t *slab) {
-    // slab hast to be allocated in chunk mode
+    // slab has to be allocated in chunk mode
     assert(slab->chunks && slab->num_chunks > 0);
 
     // free chunk must exist, otherwise we would have allocated another slab
