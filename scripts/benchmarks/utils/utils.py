@@ -32,6 +32,8 @@ def run(command, env_vars={}, cwd=None, add_sycl=False, ld_library=[]):
 
         env.update(env_vars)
 
+        # print(env)
+
         result = subprocess.run(command, cwd=cwd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=options.timeout) # nosec B603
 
         if options.verbose:
