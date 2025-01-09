@@ -1,10 +1,44 @@
-# Executes benchmarks implemented in this repository
+ # Executes benchmarks implemented in this repository
 name: Benchmarks
 
-on: workflow_call
+on: 
+  workflow_call:
+    inputs:
+      str_name:
+        required: true
+        type: string
+      unit:
+        required: true
+        type: string
+      pr_no:
+        required: true
+        # even though this is a number, this is a workaround for issues with
+        # reusable workflow calls that result in "Unexpected value '0'" error.
+        type: string
+      bench_script_params:
+        required: false
+        type: string
+        default: ''
+      sycl_config_params:
+        required: false
+        type: string
+        default: ''
+      sycl_repo:
+        required: true
+        type: string
+        default: 'intel/llvm'
+      sycl_commit:
+        required: false
+        type: string
+        default: ''
+      upload_report:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  pull-requests: write
 
 env:
   BUILD_DIR : "${{github.workspace}}/build"
@@ -77,4 +111,12 @@ jobs:
 
       - name: Run benchmarks
         working-directory: ${{env.BUILD_DIR}}
-        run: ctest -V --test-dir benchmark -C Release
+        run: >
+        numactl -N 0 ${{ github.workspace }}scripts/benchmarks/main.py
+        ~/bench_workdir
+        # --sycl ${{ github.workspace }}/sycl_build
+        # --ur ${{ github.workspace }}/ur_install
+        --umf ${{ github.workspace }}/umf_build
+        # --adapter ${{ matrix.adapter.str_name }}
+        ${{ inputs.upload_report && '--output-html' || '' }}
+        ${{ inputs.bench_script_params }}
