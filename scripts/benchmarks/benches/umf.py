@@ -177,6 +177,8 @@ class GBenchUmfProxy(GBench):
     def get_preloaded_name(self, pool_name) -> str:
         new_pool_name = pool_name.replace(self.lib_to_be_replaced, self.replacing_lib)
 
+        return new_pool_name
+
     def parse_output(self, output):
         csv_file = io.StringIO(output)
         reader = csv.reader(csv_file)
@@ -193,8 +195,8 @@ class GBenchUmfProxy(GBench):
                 mean = self.get_mean(row)
                 updated_pool = self.get_preloaded_name(pool)
                 updated_config = self.get_preloaded_name(config)
-                
-                results.append((config, pool, mean))
+
+                results.append((updated_config, updated_pool, mean))
             except KeyError as e:
                 raise ValueError(f"Error parsing output: {e}")
 
