@@ -112,11 +112,11 @@ jobs:
       - name: Run benchmarks
         working-directory: ${{env.BUILD_DIR}}
         run: >
-        numactl -N 0 ${{ github.workspace }}scripts/benchmarks/main.py
-        ~/bench_workdir
-        # --sycl ${{ github.workspace }}/sycl_build
-        # --ur ${{ github.workspace }}/ur_install
-        --umf ${{ github.workspace }}/umf_build
-        # --adapter ${{ matrix.adapter.str_name }}
-        ${{ inputs.upload_report && '--output-html' || '' }}
-        ${{ inputs.bench_script_params }}
+          numactl -N 0 ${{ github.workspace }}scripts/benchmarks/main.py
+          ~/bench_workdir
+          # --sycl ${{ github.workspace }}/sycl_build
+          # --ur ${{ github.workspace }}/ur_install
+          --umf ${{ github.workspace }}/umf_build
+          # --adapter ${{ matrix.adapter.str_name }}
+          ${{ inputs.upload_report && '--output-html' || '' }}
+          ${{ inputs.bench_script_params }}
