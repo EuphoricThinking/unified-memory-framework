@@ -4,33 +4,34 @@ name: Benchmarks
 on: 
   workflow_call:
     inputs:
-      str_name:
-        required: true
-        type: string
-      unit:
-        required: true
-        type: string
+      # str_name:
+      #   required: true
+      #   type: string
+      # unit:
+      #   required: true
+      #   type: string
       pr_no:
         required: true
         # even though this is a number, this is a workaround for issues with
         # reusable workflow calls that result in "Unexpected value '0'" error.
         type: string
+        default: '0'
       bench_script_params:
         required: false
         type: string
         default: ''
-      sycl_config_params:
-        required: false
-        type: string
-        default: ''
-      sycl_repo:
-        required: true
-        type: string
-        default: 'intel/llvm'
-      sycl_commit:
-        required: false
-        type: string
-        default: ''
+      # sycl_config_params:
+      #   required: false
+      #   type: string
+      #   default: ''
+      # sycl_repo:
+      #   required: true
+      #   type: string
+      #   default: 'intel/llvm'
+      # sycl_commit:
+      #   required: false
+      #   type: string
+      #   default: ''
       upload_report:
         required: false
         type: boolean

@@ -28,21 +28,21 @@ on:
         type: string
         required: false
         default: ''
-      sycl_config_params:
-        description: Extra params for SYCL configuration
-        type: string
-        required: false
-        default: ''
-      sycl_repo:
-        description: 'Compiler repo'
-        type: string
-        required: true
-        default: 'intel/llvm'
-      sycl_commit:
-        description: 'Compiler commit'
-        type: string
-        required: false
-        default: ''
+      # sycl_config_params:
+      #   description: Extra params for SYCL configuration
+      #   type: string
+      #   required: false
+      #   default: ''
+      # sycl_repo:
+      #   description: 'Compiler repo'
+      #   type: string
+      #   required: true
+      #   default: 'intel/llvm'
+      # sycl_commit:
+      #   description: 'Compiler commit'
+      #   type: string
+      #   required: false
+      #   default: ''
       upload_report:
         description: 'Upload HTML report'
         type: boolean
