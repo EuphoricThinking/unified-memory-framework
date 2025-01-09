@@ -58,11 +58,11 @@ jobs:
     name: Compute Benchmarks
     uses: ./.github/workflows/reusable_benchmarks.yml
     with:
-      str_name: ${{ inputs.str_name }}
-      unit: ${{ inputs.unit }}
+      # str_name: ${{ inputs.str_name }}
+      # unit: ${{ inputs.unit }}
       pr_no: ${{ inputs.pr_no }}
       bench_script_params: ${{ inputs.bench_script_params }}
-      sycl_config_params: ${{ inputs.sycl_config_params }}
-      sycl_repo: ${{ inputs.sycl_repo }}
-      sycl_commit: ${{ inputs.sycl_commit }}
+      # sycl_config_params: ${{ inputs.sycl_config_params }}
+      # sycl_repo: ${{ inputs.sycl_repo }}
+      # sycl_commit: ${{ inputs.sycl_commit }}
       upload_report: ${{ inputs.upload_report }}
