@@ -14,7 +14,7 @@ concurrency:
 
 permissions:
   contents: read
-  pull-request: write # https://github.com/orgs/community/discussions/121112#discussioncomment-10623834
+  pull-requests: write # https://github.com/orgs/community/discussions/121112#discussioncomment-10623834
 
 jobs:
   CodeChecks:
