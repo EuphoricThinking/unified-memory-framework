@@ -148,7 +148,7 @@ int main() {
     }
 #endif
 
-=======
+    =======
 >>>>>>> 002b3cbe (Debugging labels)
-    return 0;
+        return 0;
 }

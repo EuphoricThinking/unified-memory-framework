@@ -12,10 +12,12 @@ import matplotlib.dates as mdates
 from benches.result import BenchmarkRun, Result
 import numpy as np
 
+
 @dataclass
 class BenchmarkMetadata:
     unit: str
     lower_is_better: bool
+
 
 @dataclass
 class BenchmarkSeries:
@@ -23,16 +25,21 @@ class BenchmarkSeries:
     metadata: BenchmarkMetadata
     runs: list[BenchmarkRun]
 
+
 @dataclass
 class BenchmarkChart:
     label: str
     html: str
 
-def tooltip_css() -> str:
-    return '.mpld3-tooltip{background:white;padding:8px;border:1px solid #ddd;border-radius:4px;font-family:monospace;white-space:pre;}'
 
-def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str) -> list[BenchmarkChart]:
-    plt.close('all')
+def tooltip_css() -> str:
+    return ".mpld3-tooltip{background:white;padding:8px;border:1px solid #ddd;border-radius:4px;font-family:monospace;white-space:pre;}"
+
+
+def create_time_series_chart(
+    benchmarks: list[BenchmarkSeries], github_repo: str
+) -> list[BenchmarkChart]:
+    plt.close("all")
 
     num_benchmarks = len(benchmarks)
     if num_benchmarks == 0:
@@ -55,7 +62,7 @@ def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str
             all_values.extend(values)
             all_stddevs.extend(stddevs)
 
-            ax.errorbar(dates, values, yerr=stddevs, fmt='-', label=run.name, alpha=0.5)
+            ax.errorbar(dates, values, yerr=stddevs, fmt="-", label=run.name, alpha=0.5)
             scatter = ax.scatter(dates, values, picker=True)
 
             tooltip_labels = [
@@ -66,12 +73,14 @@ def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str
                 for point in sorted_points
             ]
 
-            targets = [f"https://github.com/{github_repo}/commit/{point.git_hash}"
-                      for point in sorted_points]
+            targets = [
+                f"https://github.com/{github_repo}/commit/{point.git_hash}"
+                for point in sorted_points
+            ]
 
-            tooltip = mpld3.plugins.PointHTMLTooltip(scatter, tooltip_labels,
-                css=tooltip_css(),
-                targets=targets)
+            tooltip = mpld3.plugins.PointHTMLTooltip(
+                scatter, tooltip_labels, css=tooltip_css(), targets=targets
+            )
             mpld3.plugins.connect(fig, tooltip)
 
         # This is so that the stddev doesn't fill the entire y axis on the chart
@@ -82,26 +91,37 @@ def create_time_series_chart(benchmarks: list[BenchmarkSeries], github_repo: str
             ax.set_ylim(min_value - 3 * max_stddev, max_value + 3 * max_stddev)
 
         ax.set_title(benchmark.label, pad=20)
-        performance_indicator = "lower is better" if benchmark.metadata.lower_is_better else "higher is better"
-        ax.text(0.5, 1.05, f"({performance_indicator})",
-                ha='center',
-                transform=ax.transAxes,
-                style='italic',
-                fontsize=7,
-                color='#666666')
+        performance_indicator = (
+            "lower is better"
+            if benchmark.metadata.lower_is_better
+            else "higher is better"
+        )
+        ax.text(
+            0.5,
+            1.05,
+            f"({performance_indicator})",
+            ha="center",
+            transform=ax.transAxes,
+            style="italic",
+            fontsize=7,
+            color="#666666",
+        )
 
-        ax.set_xlabel('')
+        ax.set_xlabel("")
         unit = benchmark.metadata.unit
         ax.set_ylabel(f"Value ({unit})" if unit else "Value")
         ax.grid(True, alpha=0.2)
-        ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
-        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter('%Y-%m-%d %H:%M:%S'))
+        ax.legend(bbox_to_anchor=(1, 1), loc="upper left")
+        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter("%Y-%m-%d %H:%M:%S"))
 
         plt.tight_layout()
-        html_charts.append(BenchmarkChart(html=mpld3.fig_to_html(fig), label=benchmark.label))
+        html_charts.append(
+            BenchmarkChart(html=mpld3.fig_to_html(fig), label=benchmark.label)
+        )
         plt.close(fig)
 
     return html_charts
+
 
 @dataclass
 class ExplicitGroup:
@@ -110,20 +130,28 @@ class ExplicitGroup:
     metadata: BenchmarkMetadata
     runs: dict[str, dict[str, Result]]
 
-def create_explicit_groups(benchmark_runs: list[BenchmarkRun], compare_names: list[str]) -> list[ExplicitGroup]:
+
+def create_explicit_groups(
+    benchmark_runs: list[BenchmarkRun], compare_names: list[str]
+) -> list[ExplicitGroup]:
     groups = {}
     counted = {}
 
     for run in benchmark_runs:
         if run.name in compare_names:
             for res in run.results:
-                if res.explicit_group != '':
+                if res.explicit_group != "":
                     if res.explicit_group not in groups:
                         counted[res.explicit_group] = 1
 
-                        groups[res.explicit_group] = ExplicitGroup(name=res.explicit_group, nnames=len(compare_names),
-                                metadata=BenchmarkMetadata(unit=res.unit, lower_is_better=res.lower_is_better),
-                                runs={})
+                        groups[res.explicit_group] = ExplicitGroup(
+                            name=res.explicit_group,
+                            nnames=len(compare_names),
+                            metadata=BenchmarkMetadata(
+                                unit=res.unit, lower_is_better=res.lower_is_better
+                            ),
+                            runs={},
+                        )
                     else:
                         counted[res.explicit_group] = counted[res.explicit_group] + 1
 
@@ -140,8 +168,9 @@ def create_explicit_groups(benchmark_runs: list[BenchmarkRun], compare_names: li
 
     return list(groups.values())
 
+
 def create_grouped_bar_charts(groups: list[ExplicitGroup]) -> list[BenchmarkChart]:
-    plt.close('all')
+    plt.close("all")
 
     html_charts = []
 
@@ -163,52 +192,70 @@ def create_grouped_bar_charts(groups: list[ExplicitGroup]) -> list[BenchmarkChar
             rects = ax.bar(positions, valid_data, width, label=run_name)
             # This is a hack to disable all bar_label. Setting labels to empty doesn't work.
             # We create our own labels below for each bar, this works better in mpld3.
-            ax.bar_label(rects, fmt='')
+            ax.bar_label(rects, fmt="")
             for rect, run, res in zip(rects, run_results.keys(), run_results.values()):
                 height = rect.get_height()
                 if height > max_height:
                     max_height = height
 
-                ax.text(rect.get_x() + rect.get_width()/2., height + 2,
-                                    f'{res.value:.1f}',
-                                    ha='center', va='bottom', fontsize=9)
+                ax.text(
+                    rect.get_x() + rect.get_width() / 2.0,
+                    height + 2,
+                    f"{res.value:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=9,
+                )
 
                 tooltip_labels = [
                     f"Run: {run}\n"
                     f"Label: {res.label}\n"
                     f"Value: {res.value:.2f} {res.unit}\n"
                 ]
-                tooltip = mpld3.plugins.LineHTMLTooltip(rect, tooltip_labels, css=tooltip_css())
+                tooltip = mpld3.plugins.LineHTMLTooltip(
+                    rect, tooltip_labels, css=tooltip_css()
+                )
                 mpld3.plugins.connect(ax.figure, tooltip)
 
         ax.set_xticks([])
-        ax.grid(True, axis='y', alpha=0.2)
+        ax.grid(True, axis="y", alpha=0.2)
         ax.set_ylabel(f"Value ({group.metadata.unit})")
-        ax.legend(loc='upper left')
+        ax.legend(loc="upper left")
         ax.set_title(group.name, pad=20)
-        performance_indicator = "lower is better" if group.metadata.lower_is_better else "higher is better"
-        ax.text(0.5, 1.03, f"({performance_indicator})",
-                ha='center',
-                transform=ax.transAxes,
-                style='italic',
-                fontsize=7,
-                color='#666666')
+        performance_indicator = (
+            "lower is better" if group.metadata.lower_is_better else "higher is better"
+        )
+        ax.text(
+            0.5,
+            1.03,
+            f"({performance_indicator})",
+            ha="center",
+            transform=ax.transAxes,
+            style="italic",
+            fontsize=7,
+            color="#666666",
+        )
 
         for idx, label in enumerate(x_labels):
             # this is a hack to get labels to show above the legend
             # we normalize the idx to transAxes transform and offset it a little.
-            x_norm = (idx + 0.3 - ax.get_xlim()[0]) / (ax.get_xlim()[1] - ax.get_xlim()[0])
-            ax.text(x_norm, 1.00, label,
-                transform=ax.transAxes,
-                color='#666666')
+            x_norm = (idx + 0.3 - ax.get_xlim()[0]) / (
+                ax.get_xlim()[1] - ax.get_xlim()[0]
+            )
+            ax.text(x_norm, 1.00, label, transform=ax.transAxes, color="#666666")
 
         plt.tight_layout()
-        html_charts.append(BenchmarkChart(label=group.name, html=mpld3.fig_to_html(fig)))
+        html_charts.append(
+            BenchmarkChart(label=group.name, html=mpld3.fig_to_html(fig))
+        )
         plt.close(fig)
 
     return html_charts
 
-def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: list[str]) -> list[BenchmarkSeries]:
+
+def process_benchmark_data(
+    benchmark_runs: list[BenchmarkRun], compare_names: list[str]
+) -> list[BenchmarkSeries]:
     benchmark_metadata: dict[str, BenchmarkMetadata] = {}
     run_map: dict[str, dict[str, list[Result]]] = defaultdict(lambda: defaultdict(list))
 
@@ -219,8 +266,7 @@ def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: li
         for result in run.results:
             if result.label not in benchmark_metadata:
                 benchmark_metadata[result.label] = BenchmarkMetadata(
-                    unit=result.unit,
-                    lower_is_better=result.lower_is_better
+                    unit=result.unit, lower_is_better=result.lower_is_better
                 )
 
             result.date = run.date
@@ -233,24 +279,31 @@ def process_benchmark_data(benchmark_runs: list[BenchmarkRun], compare_names: li
             BenchmarkRun(name=run_name, results=results)
             for run_name, results in run_map[label].items()
         ]
-        benchmark_series.append(BenchmarkSeries(
-            label=label,
-            metadata=metadata,
-            runs=runs
-        ))
+        benchmark_series.append(
+            BenchmarkSeries(label=label, metadata=metadata, runs=runs)
+        )
 
     return benchmark_series
 
-def generate_html(benchmark_runs: list[BenchmarkRun], github_repo: str, compare_names: list[str]) -> str:
+
+def generate_html(
+    benchmark_runs: list[BenchmarkRun], github_repo: str, compare_names: list[str]
+) -> str:
     benchmarks = process_benchmark_data(benchmark_runs, compare_names)
 
     timeseries = create_time_series_chart(benchmarks, github_repo)
-    timeseries_charts_html = '\n'.join(f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>' for ts in timeseries)
+    timeseries_charts_html = "\n".join(
+        f'<div class="chart" data-label="{ts.label}"><div>{ts.html}</div></div>'
+        for ts in timeseries
+    )
 
     explicit_groups = create_explicit_groups(benchmark_runs, compare_names)
 
     bar_charts = create_grouped_bar_charts(explicit_groups)
-    bar_charts_html = '\n'.join(f'<div class="chart" data-label="{bc.label}"><div>{bc.html}</div></div>' for bc in bar_charts)
+    bar_charts_html = "\n".join(
+        f'<div class="chart" data-label="{bc.label}"><div>{bc.html}</div></div>'
+        for bc in bar_charts
+    )
 
     html_template = f"""
     <!DOCTYPE html>

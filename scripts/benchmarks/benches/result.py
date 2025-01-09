@@ -8,6 +8,7 @@ from typing import Optional
 from dataclasses_json import dataclass_json
 from datetime import datetime
 
+
 @dataclass_json
 @dataclass
 class Result:
@@ -25,13 +26,14 @@ class Result:
     # values below should not be set by the benchmark
     name: str = ""
     lower_is_better: bool = True
-    git_hash: str = ''
+    git_hash: str = ""
     date: Optional[datetime] = None
+
 
 @dataclass_json
 @dataclass
 class BenchmarkRun:
     results: list[Result]
-    name: str = 'This PR'
-    git_hash: str = ''
+    name: str = "This PR"
+    git_hash: str = ""
     date: datetime = None

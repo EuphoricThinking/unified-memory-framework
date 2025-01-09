@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum
 
+
 class Compare(Enum):
-    LATEST = 'latest'
-    AVERAGE = 'average'
-    MEDIAN = 'median'
+    LATEST = "latest"
+    AVERAGE = "average"
+    MEDIAN = "median"
+
 
 @dataclass
 class Options:
@@ -19,7 +21,7 @@ class Options:
     iterations: int = 3
     verbose: bool = False
     compare: Compare = Compare.LATEST
-    compare_max: int = 10 # average/median over how many results
+    compare_max: int = 10  # average/median over how many results
     output_html: bool = False
     output_markdown: bool = True
     dry_run: bool = False
@@ -28,5 +30,5 @@ class Options:
     epsilon: float = 0.02
     stddev_validation_iterations: int = 5
 
-options = Options()
 
+options = Options()
