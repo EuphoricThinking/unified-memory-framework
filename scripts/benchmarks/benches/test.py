@@ -3,7 +3,7 @@
 # See LICENSE.TXT
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import random
+import secrets #random
 from utils.utils import git_clone
 from .base import Benchmark, Suite
 from .result import Result
@@ -59,7 +59,7 @@ class TestBench(Benchmark):
         return
 
     def run(self, env_vars) -> list[Result]:
-        random_value = self.value + random.uniform(-1 * (self.diff), self.diff)
+        random_value = self.value + secrets.choice([-1, 1]) * secrets.randbelow(self.diff) #secrets.uniform(-1 * (self.diff), self.diff)
         return [
             Result(
                 label=self.name(),

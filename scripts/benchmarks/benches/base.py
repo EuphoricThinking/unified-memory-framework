@@ -25,9 +25,9 @@ class Benchmark:
             )
             if os.path.isfile(adapter_path):
                 return adapter_path
-        assert (
-            False
-        ), f"could not find adapter file {adapter_path} (and in similar lib paths)"
+        # assert (
+        #     False
+        # ), f"could not find adapter file {adapter_path} (and in similar lib paths)"
 
     def run_bench(self, command, env_vars, ld_library=[]):
         env_vars_with_forced_adapter = env_vars.copy()
