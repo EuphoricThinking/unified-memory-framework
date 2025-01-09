@@ -152,9 +152,6 @@ def create_grouped_bar_charts(groups: list[ExplicitGroup]) -> list[BenchmarkChar
         x_labels = []
         width = 0.8 / len(group.runs)
 
-        print("group name |", group.nnames)
-        print("runs per group|", group.runs)
-
         max_height = 0
 
         for i, (run_name, run_results) in enumerate(group.runs.items()):
