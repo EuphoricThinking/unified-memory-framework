@@ -95,7 +95,8 @@ struct alloc_data {
         ->ArgNames(                                                            \
             BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::argsName())      \
         ->Name(BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::name())       \
-        ->MinWarmUpTime(1)
+        ->Iterations(                                                          \
+            BENCHMARK_PRIVATE_CONCAT_NAME(BaseClass, Method)::iterations())
 
 class fixed_alloc_size : public alloc_size_interface {
   public:
@@ -131,7 +132,7 @@ class uniform_alloc_size : public alloc_size_interface {
     void TearDown([[maybe_unused]] ::benchmark::State &state) override {}
     size_t nextSize() override { return dist(generator) * multiplier; }
     static std::vector<std::string> argsName() {
-        return {"min_size", "max_size", "granularity"};
+        return {"min size", "max size", "granularity"};
     }
 
   private:
@@ -140,7 +141,7 @@ class uniform_alloc_size : public alloc_size_interface {
     size_t multiplier;
 };
 
-// This class benchmark speed of alloc() operations.
+// This class benchmarks speed of alloc() operations.
 template <
     typename Size, typename Alloc,
     typename =
@@ -165,7 +166,7 @@ class alloc_benchmark : public benchmark_interface<Size, Alloc> {
         base::allocator.SetUp(state, argPos);
 
         // initialize allocations tracking vectors (one per thread)
-        // and iterators for this vectors.
+        // and iterators for these vectors.
         allocations.resize(state.threads());
         iters.resize(state.threads());
 
@@ -231,13 +232,16 @@ class alloc_benchmark : public benchmark_interface<Size, Alloc> {
             state.ResumeTiming();
         }
     }
+
     static std::vector<std::string> argsName() {
         auto n = benchmark_interface<Size, Alloc>::argsName();
         std::vector<std::string> res = {"max_allocs", "pre_allocs"};
         res.insert(res.end(), n.begin(), n.end());
         return res;
     }
+
     static std::string name() { return base::name() + "/alloc"; }
+    static int64_t iterations() { return 200000; }
 
   protected:
     using base = benchmark_interface<Size, Alloc>;
@@ -318,12 +322,16 @@ class multiple_malloc_free_benchmark : public alloc_benchmark<Size, Alloc> {
     static std::string name() {
         return base::base::name() + "/multiple_malloc_free";
     }
+
     static std::vector<std::string> argsName() {
         auto n = benchmark_interface<Size, Alloc>::argsName();
         std::vector<std::string> res = {"max_allocs"};
         res.insert(res.end(), n.begin(), n.end());
         return res;
     }
+
+    static int64_t iterations() { return 2000; }
+
     std::default_random_engine generator;
     distribution dist;
 };
@@ -349,9 +357,11 @@ class provider_allocator : public allocator_interface {
         }
         return ptr;
     }
+
     void benchFree(void *ptr, size_t size) override {
         umfMemoryProviderFree(provider.provider, ptr, size);
     }
+
     static std::string name() { return Provider::name(); }
 
   private:
@@ -371,6 +381,7 @@ template <typename Pool> class pool_allocator : public allocator_interface {
     virtual void *benchAlloc(size_t size) override {
         return umfPoolMalloc(pool.pool, size);
     }
+
     virtual void benchFree(void *ptr, [[maybe_unused]] size_t size) override {
         umfPoolFree(pool.pool, ptr);
     }

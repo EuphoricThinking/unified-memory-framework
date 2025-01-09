@@ -134,7 +134,7 @@ endif()
 
 add_umf_benchmark(
     NAME ubench
-    SRCS ubench.c
+    SRCS ubench.c ${SRCS_OPTIONAL}
     LIBS ${LIBS_OPTIONAL}
     LIBDIRS ${LIB_DIRS})
 
