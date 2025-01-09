@@ -17,7 +17,7 @@ The scripts will try to reuse the files stored in `~/benchmarks_workdir/`, but t
 
 ## Running in CI
 
-The benchmarks scripts are used in a GitHub Actions worflow, and can be automatically executed on a preconfigured system against any Pull Request.
+The benchmarks scripts are used in a GitHub Actions workflow, and can be automatically executed on a preconfigured system against any Pull Request.
 
 ![compute benchmarks](workflow.png "Compute Benchmarks CI job")
 
