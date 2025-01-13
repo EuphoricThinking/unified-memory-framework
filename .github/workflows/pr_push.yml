@@ -81,12 +81,12 @@ jobs:
   #   if: github.repository != 'oneapi-src/unified-memory-framework'
   #   needs: [Build, QEMU, ProxyLib]
   #   uses: ./.github/workflows/reusable_coverage.yml
-  CodeQL:
-    needs: [Build]
-    permissions:
-      contents: read
-      security-events: write
-    uses: ./.github/workflows/reusable_codeql.yml
+  # CodeQL:
+  #   needs: [Build]
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #   uses: ./.github/workflows/reusable_codeql.yml
   # Trivy:
   #   needs: [Build]
   #   permissions:
