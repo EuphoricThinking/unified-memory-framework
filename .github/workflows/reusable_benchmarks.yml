@@ -124,6 +124,7 @@ jobs:
           pip install --force-reinstall -r ${{github.workspace}}/ur-repo/third_party/benchmark_requirements.txt
 
       - name: Install HWLOC
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install libhwloc-dev
