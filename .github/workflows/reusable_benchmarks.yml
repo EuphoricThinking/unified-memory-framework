@@ -133,9 +133,10 @@ jobs:
         run: >
           ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
           ~/bench_workdir
-          # --sycl ${{ github.workspace }}/sycl_build
-          # --ur ${{ github.workspace }}/ur_install
           --umf  ${{env.BUILD_DIR}}
-          # --adapter ${{ matrix.adapter.str_name }}
           ${{ inputs.upload_report && '--output-html' || '' }}
           ${{ inputs.bench_script_params }}
+          # --sycl ${{ github.workspace }}/sycl_build
+          # --ur ${{ github.workspace }}/ur_install
+          # --adapter ${{ matrix.adapter.str_name }}
+          
