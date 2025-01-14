@@ -134,7 +134,9 @@ jobs:
         run: >
           ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
           ~/bench_workdir
-          --umf  ${{env.BUILD_DIR}}
+          --umf  ${{env.BUILD_DIR}} 
+          --stdev-validity-check-iterations 2 
+          --iterations 2
           ${{ inputs.upload_report && '--output-html' || '' }}
           ${{ inputs.bench_script_params }}
           # --sycl ${{ github.workspace }}/sycl_build
