@@ -114,7 +114,7 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           repository: EuphoricThinking/unified-runtime
-          ref: a9193c35d1aa6c54985a2f35453cd19a22441d58
+          ref: be97de36b6abd698db0309d08abd64e7aa8ae8b1
           path: ur-repo
           fetch-depth: 1
           fetch-tags: false
