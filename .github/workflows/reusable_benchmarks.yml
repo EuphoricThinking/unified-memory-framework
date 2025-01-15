@@ -129,7 +129,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install libhwloc-dev
 
+     # TODO remove reduced iterations after tests
       - name: Run benchmarks
+        if: matrix.os == 'ubuntu-latest'
         working-directory: ${{env.BUILD_DIR}}
         run: >
           ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
@@ -142,4 +144,21 @@ jobs:
           # --sycl ${{ github.workspace }}/sycl_build
           # --ur ${{ github.workspace }}/ur_install
           # --adapter ${{ matrix.adapter.str_name }}
+
+      # TODO remove reduced iterations after tests
+      - name: Run benchmarks
+        if: matrix.os == 'windows-latest'
+        working-directory: ${{env.BUILD_DIR}}
+        run: >
+          python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
+          ~/bench_workdir
+          --umf  ${{env.BUILD_DIR}} 
+          --stdev-validity-check-iterations 2 
+          --iterations 2
+          ${{ inputs.upload_report && '--output-html' || '' }}
+          ${{ inputs.bench_script_params }}
+          # --sycl ${{ github.workspace }}/sycl_build
+          # --ur ${{ github.workspace }}/ur_install
+          # --adapter ${{ matrix.adapter.str_name }}
           
+
