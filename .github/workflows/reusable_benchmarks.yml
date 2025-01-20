@@ -140,15 +140,6 @@ jobs:
         ${{ inputs.upload_report && '--output-html' || '' }}
         ${{ inputs.bench_script_params }}
 
-        #--stdev-validity-check-iterations 2 
-        #--iterations 2
-        
-        ${{ inputs.upload_report && '--output-html' || '' }}
-        ${{ inputs.bench_script_params }}
-        # --sycl ${{ github.workspace }}/sycl_build
-        # --ur ${{ github.workspace }}/ur_install
-        # --adapter ${{ matrix.adapter.str_name }}
-
     # TODO remove reduced iterations after tests
     - name: Run benchmarks
       if: matrix.os == 'windows-latest'
@@ -159,14 +150,6 @@ jobs:
         --umf  ${{env.BUILD_DIR}} 
         ${{ inputs.upload_report && '--output-html' || '' }}
         ${{ inputs.bench_script_params }}
-
-
-        # --iterations-stddev 2 
-        # --iterations 2
-
-        # --sycl ${{ github.workspace }}/sycl_build
-        # --ur ${{ github.workspace }}/ur_install
-        # --adapter ${{ matrix.adapter.str_name }}
         
     - name: Upload HTML report
       if: ${{ always() && inputs.upload_report }}
