@@ -155,5 +155,5 @@ jobs:
       if: ${{ always() && inputs.upload_report }}
       uses: actions/cache/save@36f1e144e1c8edb0a652766b484448563d8baf46   #@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
       with:
-        path: ur-repo/benchmark_results.html
+        path: ${{env.BUILD_DIR}}/benchmark_results.html
         key: benchmark-results-${{ github.run_id }}
