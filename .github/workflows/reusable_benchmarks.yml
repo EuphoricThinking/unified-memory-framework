@@ -153,17 +153,20 @@ jobs:
         python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
         ~/bench_workdir
         --umf  ${{env.BUILD_DIR}} 
-        --stdev-validity-check-iterations 2 
-        --iterations 2
         ${{ inputs.upload_report && '--output-html' || '' }}
         ${{ inputs.bench_script_params }}
+
+
+        # --iterations-stddev 2 
+        # --iterations 2
+
         # --sycl ${{ github.workspace }}/sycl_build
         # --ur ${{ github.workspace }}/ur_install
         # --adapter ${{ matrix.adapter.str_name }}
         
     - name: Upload HTML report
       if: ${{ always() && inputs.upload_report }}
-      uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+      uses: actions/cache/save@36f1e144e1c8edb0a652766b484448563d8baf46   #@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
       with:
         path: ur-repo/benchmark_results.html
         key: benchmark-results-${{ github.run_id }}
