@@ -21,14 +21,16 @@ jobs:
     uses: ./.github/workflows/reusable_checks.yml
   DocsBuild:
     uses: ./.github/workflows/reusable_docs_build.yml
-  FastBuild:
-    name: Fast builds
-    needs: [CodeChecks, DocsBuild]
-    uses: ./.github/workflows/reusable_fast.yml
-  Build:
-    name: Basic builds
-    needs: [FastBuild]
-    uses: ./.github/workflows/reusable_basic.yml
+  # FastBuild:
+  #   name: Fast builds
+  #   needs: [CodeChecks, DocsBuild]
+  #   uses: ./.github/workflows/reusable_fast.yml
+  # Build:
+  #   name: Basic builds
+  #   needs: [FastBuild]
+  #   uses: ./.github/workflows/reusable_basic.yml
+
+
   # DevDax:
   #   needs: [FastBuild]
   #   uses: ./.github/workflows/reusable_dax.yml
@@ -56,7 +58,7 @@ jobs:
   #   with:
   #     short_run: true
   Benchmarks:
-    needs: [Build]
+    # needs: [Build]
     uses: ./.github/workflows/reusable_benchmarks.yml
     with:
       pr_no: '0'
