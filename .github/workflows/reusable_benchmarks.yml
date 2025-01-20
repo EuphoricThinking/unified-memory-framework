@@ -60,105 +60,110 @@ jobs:
     runs-on: ${{matrix.os}}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      with:
+        fetch-depth: 0
 
-      - name: Install apt packages
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake libhwloc-dev libnuma-dev libtbb-dev
+    - name: Install apt packages
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake libhwloc-dev libnuma-dev libtbb-dev
 
-      - name: Initialize vcpkg
-        if: matrix.os == 'windows-latest'
-        uses: lukka/run-vcpkg@5e0cab206a5ea620130caf672fce3e4a6b5666a1 # v11.5
-        with:
-          vcpkgGitCommitId: 3dd44b931481d7a8e9ba412621fa810232b66289
-          vcpkgDirectory: ${{env.BUILD_DIR}}/vcpkg
-          vcpkgJsonGlob: '**/vcpkg.json'
+    - name: Initialize vcpkg
+      if: matrix.os == 'windows-latest'
+      uses: lukka/run-vcpkg@5e0cab206a5ea620130caf672fce3e4a6b5666a1 # v11.5
+      with:
+        vcpkgGitCommitId: 3dd44b931481d7a8e9ba412621fa810232b66289
+        vcpkgDirectory: ${{env.BUILD_DIR}}/vcpkg
+        vcpkgJsonGlob: '**/vcpkg.json'
 
-      - name: Install vcpkg packages
-        if: matrix.os == 'windows-latest'
-        run: vcpkg install
-        shell: pwsh # Specifies PowerShell as the shell for running the script.
+    - name: Install vcpkg packages
+      if: matrix.os == 'windows-latest'
+      run: vcpkg install
+      shell: pwsh # Specifies PowerShell as the shell for running the script.
 
-      - name: Configure build
-        run: >
-          cmake
-          -B ${{env.BUILD_DIR}}
-          ${{matrix.extra_build_option}}
-          -DCMAKE_INSTALL_PREFIX="${{env.INSTL_DIR}}"
-          -DCMAKE_PREFIX_PATH="${{env.VCPKG_PATH}}"
-          -DUMF_BUILD_SHARED_LIBRARY=ON
-          -DUMF_BUILD_BENCHMARKS=ON
-          -DUMF_BUILD_BENCHMARKS_MT=ON
-          -DUMF_BUILD_TESTS=OFF
-          -DUMF_FORMAT_CODE_STYLE=OFF
-          -DUMF_DEVELOPER_MODE=OFF
-          -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON
-          -DUMF_BUILD_CUDA_PROVIDER=ON
-          -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
-          -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
+    - name: Configure build
+      run: >
+        cmake
+        -B ${{env.BUILD_DIR}}
+        ${{matrix.extra_build_option}}
+        -DCMAKE_INSTALL_PREFIX="${{env.INSTL_DIR}}"
+        -DCMAKE_PREFIX_PATH="${{env.VCPKG_PATH}}"
+        -DUMF_BUILD_SHARED_LIBRARY=ON
+        -DUMF_BUILD_BENCHMARKS=ON
+        -DUMF_BUILD_BENCHMARKS_MT=ON
+        -DUMF_BUILD_TESTS=OFF
+        -DUMF_FORMAT_CODE_STYLE=OFF
+        -DUMF_DEVELOPER_MODE=OFF
+        -DUMF_BUILD_LEVEL_ZERO_PROVIDER=ON
+        -DUMF_BUILD_CUDA_PROVIDER=ON
+        -DUMF_BUILD_LIBUMF_POOL_DISJOINT=ON
+        -DUMF_BUILD_LIBUMF_POOL_JEMALLOC=ON
 
-      - name: Build UMF on Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: cmake --build ${{env.BUILD_DIR}} -j $(nproc)
+    - name: Build UMF on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: cmake --build ${{env.BUILD_DIR}} -j $(nproc)
 
-      - name: Build UMF on Windows
-        if: matrix.os == 'windows-latest'
-        run: cmake --build ${{env.BUILD_DIR}} --config Release -j $Env:NUMBER_OF_PROCESSORS
+    - name: Build UMF on Windows
+      if: matrix.os == 'windows-latest'
+      run: cmake --build ${{env.BUILD_DIR}} --config Release -j $Env:NUMBER_OF_PROCESSORS
 
-      - name: Checkout UR
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          repository: EuphoricThinking/unified-runtime
-          ref: 3ab71bb5483840c49b20e2a533a814bca53034e9
-          path: ur-repo
-          fetch-depth: 1
-          fetch-tags: false
+    - name: Checkout UR
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      with:
+        repository: oneapi-src/unified-runtime
+        #ref: 3ab71bb5483840c49b20e2a533a814bca53034e9
+        path: ur-repo
+        fetch-depth: 1
+        fetch-tags: false
 
-      - name: Install pip packages
-        run: |
-          pip install --force-reinstall -r ${{github.workspace}}/ur-repo/third_party/benchmark_requirements.txt
+    - name: Install pip packages
+      run: |
+        pip install --force-reinstall -r ${{github.workspace}}/ur-repo/third_party/benchmark_requirements.txt
 
-      - name: Install HWLOC
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install libhwloc-dev
+    - name: Install HWLOC
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install libhwloc-dev
 
-     # TODO remove reduced iterations after tests
-      - name: Run benchmarks
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: ${{env.BUILD_DIR}}
-        run: >
-          ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
-          ~/bench_workdir
-          --umf  ${{env.BUILD_DIR}} 
-          --stdev-validity-check-iterations 2 
-          --iterations 2
-          ${{ inputs.upload_report && '--output-html' || '' }}
-          ${{ inputs.bench_script_params }}
-          # --sycl ${{ github.workspace }}/sycl_build
-          # --ur ${{ github.workspace }}/ur_install
-          # --adapter ${{ matrix.adapter.str_name }}
+    # TODO remove reduced iterations after tests
+    - name: Run benchmarks
+      if: matrix.os == 'ubuntu-latest'
+      working-directory: ${{env.BUILD_DIR}}
+      run: >
+        ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
+        ~/bench_workdir
+        --umf  ${{env.BUILD_DIR}} 
+        --stdev-validity-check-iterations 2 
+        --iterations 2
+        ${{ inputs.upload_report && '--output-html' || '' }}
+        ${{ inputs.bench_script_params }}
+        # --sycl ${{ github.workspace }}/sycl_build
+        # --ur ${{ github.workspace }}/ur_install
+        # --adapter ${{ matrix.adapter.str_name }}
 
-      # TODO remove reduced iterations after tests
-      - name: Run benchmarks
-        if: matrix.os == 'windows-latest'
-        working-directory: ${{env.BUILD_DIR}}
-        run: >
-          python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
-          ~/bench_workdir
-          --umf  ${{env.BUILD_DIR}} 
-          --stdev-validity-check-iterations 2 
-          --iterations 2
-          ${{ inputs.upload_report && '--output-html' || '' }}
-          ${{ inputs.bench_script_params }}
-          # --sycl ${{ github.workspace }}/sycl_build
-          # --ur ${{ github.workspace }}/ur_install
-          # --adapter ${{ matrix.adapter.str_name }}
-          
-
+    # TODO remove reduced iterations after tests
+    - name: Run benchmarks
+      if: matrix.os == 'windows-latest'
+      working-directory: ${{env.BUILD_DIR}}
+      run: >
+        python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
+        ~/bench_workdir
+        --umf  ${{env.BUILD_DIR}} 
+        --stdev-validity-check-iterations 2 
+        --iterations 2
+        ${{ inputs.upload_report && '--output-html' || '' }}
+        ${{ inputs.bench_script_params }}
+        # --sycl ${{ github.workspace }}/sycl_build
+        # --ur ${{ github.workspace }}/ur_install
+        # --adapter ${{ matrix.adapter.str_name }}
+        
+    - name: Upload HTML report
+      if: ${{ always() && inputs.upload_report }}
+      uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+      with:
+        path: ur-repo/benchmark_results.html
+        key: benchmark-results-${{ github.run_id }}
