@@ -5,10 +5,11 @@ name: Nightly
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 0 * * *'
+    - cron:  '12 9 * * *'
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   fuzz-test:
