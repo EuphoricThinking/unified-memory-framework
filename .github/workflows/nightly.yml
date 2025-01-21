@@ -5,7 +5,7 @@ name: Nightly
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '13 53 * * *'
+    - cron:  '56 13 * * *'
 
 permissions:
   contents: read
