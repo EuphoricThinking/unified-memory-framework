@@ -56,7 +56,7 @@ jobs:
       # exact or partial cache hit
       if: steps.download-bench-html.outputs.cache-hit != ''
       run: |
-        mv ${{github.workspace }}/build/benchmark_results.html ${{ github.workspace }}/build/docs_build/generated/html
+        mv ${{ github.workspace }}/build/benchmark_results.html ${{ github.workspace }}/build/docs_build/generated/html
 
     - name: Upload artifact
       if: ${{ inputs.upload == true }}
