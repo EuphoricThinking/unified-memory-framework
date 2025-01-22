@@ -87,7 +87,7 @@ jobs:
     # We need to fetch special ref for proper PR's merge commit. Note, this ref may be absent if the PR is already merged.
     - name: Fetch PR's merge commit
       if: ${{ inputs.pr_no != 0 }}
-      #working-directory: ${{github.workspace}}/ur-repo
+      working-directory: ${{github.workspace}} #/ur-repo
       env:
         PR_NO: ${{ inputs.pr_no }}
       run: |
