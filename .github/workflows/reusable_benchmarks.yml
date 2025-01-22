@@ -159,6 +159,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install libhwloc-dev
 
+    # bąbelki
+
     # TODO remove reduced iterations after tests
     - name: Run benchmarks
       if: matrix.os == 'ubuntu-latest'
