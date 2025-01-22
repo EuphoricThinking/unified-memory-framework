@@ -52,7 +52,7 @@ jobs:
       VCPKG_PATH: "${{github.workspace}}/build/vcpkg/packages/hwloc_x64-windows;${{github.workspace}}/build/vcpkg/packages/tbb_x64-windows;${{github.workspace}}/build/vcpkg/packages/jemalloc_x64-windows"
     strategy:
       matrix:
-        os: ['ubuntu-latest', 'windows-latest']
+        os: ['ubuntu-latest'] #, 'windows-latest']
         include: 
           # Windows doesn't recognize 'CMAKE_BUILD_TYPE', it uses '--config' param in build command to determine the build type
           - os: ubuntu-latest
@@ -101,18 +101,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake libhwloc-dev libnuma-dev libtbb-dev
 
-    - name: Initialize vcpkg
-      if: matrix.os == 'windows-latest'
-      uses: lukka/run-vcpkg@5e0cab206a5ea620130caf672fce3e4a6b5666a1 # v11.5
-      with:
-        vcpkgGitCommitId: 3dd44b931481d7a8e9ba412621fa810232b66289
-        vcpkgDirectory: ${{env.BUILD_DIR}}/vcpkg
-        vcpkgJsonGlob: '**/vcpkg.json'
+    # - name: Initialize vcpkg
+    #   if: matrix.os == 'windows-latest'
+    #   uses: lukka/run-vcpkg@5e0cab206a5ea620130caf672fce3e4a6b5666a1 # v11.5
+    #   with:
+    #     vcpkgGitCommitId: 3dd44b931481d7a8e9ba412621fa810232b66289
+    #     vcpkgDirectory: ${{env.BUILD_DIR}}/vcpkg
+    #     vcpkgJsonGlob: '**/vcpkg.json'
 
-    - name: Install vcpkg packages
-      if: matrix.os == 'windows-latest'
-      run: vcpkg install
-      shell: pwsh # Specifies PowerShell as the shell for running the script.
+    # - name: Install vcpkg packages
+    #   if: matrix.os == 'windows-latest'
+    #   run: vcpkg install
+    #   shell: pwsh # Specifies PowerShell as the shell for running the script.
 
     - name: Configure build
       run: >
@@ -136,9 +136,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: cmake --build ${{env.BUILD_DIR}} -j $(nproc)
 
-    - name: Build UMF on Windows
-      if: matrix.os == 'windows-latest'
-      run: cmake --build ${{env.BUILD_DIR}} --config Release -j $Env:NUMBER_OF_PROCESSORS
+    # - name: Build UMF on Windows
+    #   if: matrix.os == 'windows-latest'
+    #   run: cmake --build ${{env.BUILD_DIR}} --config Release -j $Env:NUMBER_OF_PROCESSORS
 
     - name: Checkout UR
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -170,16 +170,16 @@ jobs:
         ${{ inputs.upload_report && '--output-html' || '' }}
         ${{ inputs.bench_script_params }}
 
-    # TODO remove reduced iterations after tests
-    - name: Run benchmarks
-      if: matrix.os == 'windows-latest'
-      working-directory: ${{env.BUILD_DIR}}
-      run: >
-        python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
-        ~/bench_workdir
-        --umf  ${{env.BUILD_DIR}} 
-        ${{ inputs.upload_report && '--output-html' || '' }}
-        ${{ inputs.bench_script_params }}
+    # # TODO remove reduced iterations after tests
+    # - name: Run benchmarks
+    #   if: matrix.os == 'windows-latest'
+    #   working-directory: ${{env.BUILD_DIR}}
+    #   run: >
+    #     python3 ${{ github.workspace }}/ur-repo/scripts/benchmarks/main.py
+    #     ~/bench_workdir
+    #     --umf  ${{env.BUILD_DIR}} 
+    #     ${{ inputs.upload_report && '--output-html' || '' }}
+    #     ${{ inputs.bench_script_params }}
 
     - name: Add comment to PR
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
