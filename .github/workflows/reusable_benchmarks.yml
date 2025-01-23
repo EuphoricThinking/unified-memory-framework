@@ -171,6 +171,10 @@ jobs:
         ${{ inputs.upload_report && '--output-html' || '' }}
         ${{ inputs.bench_script_params }}
 
+    - name: Test output
+      run: >
+        echo 'out: ${{ steps.benchmarks.outcome }}'
+
     # # TODO remove reduced iterations after tests
     # - name: Run benchmarks
     #   if: matrix.os == 'windows-latest'
