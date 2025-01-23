@@ -189,7 +189,7 @@ jobs:
           let markdown = ""
           try {
             const fs = require('fs');
-            markdown = fs.readFileSync('ur-repo/benchmark_results.md', 'utf8');
+            markdown = fs.readFileSync('${{env.BUILD_DIR}}/benchmark_results.md', 'utf8');
           } catch(err) {
           }
 
