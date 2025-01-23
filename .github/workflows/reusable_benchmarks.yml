@@ -161,6 +161,7 @@ jobs:
 
     # TODO remove reduced iterations after tests
     - name: Run benchmarks
+      id: benchmarks
       if: matrix.os == 'ubuntu-latest'
       working-directory: ${{env.BUILD_DIR}}
       run: >
