@@ -30,8 +30,8 @@ env:
 jobs:
   benchmarks:
     name: Benchmarks
-    env:
-      VCPKG_PATH: "${{github.workspace}}/build/vcpkg/packages/hwloc_x64-windows;${{github.workspace}}/build/vcpkg/packages/tbb_x64-windows;${{github.workspace}}/build/vcpkg/packages/jemalloc_x64-windows"
+    # env:
+      # VCPKG_PATH: "${{github.workspace}}/build/vcpkg/packages/hwloc_x64-windows;${{github.workspace}}/build/vcpkg/packages/tbb_x64-windows;${{github.workspace}}/build/vcpkg/packages/jemalloc_x64-windows"
     strategy:
       matrix:
         os: ['ubuntu-latest'] #, 'windows-latest']
@@ -60,7 +60,7 @@ jobs:
           })
 
     - name: Checkout
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
 
@@ -93,13 +93,13 @@ jobs:
     #   run: vcpkg install
     #   shell: pwsh # Specifies PowerShell as the shell for running the script.
 
+    # -DCMAKE_PREFIX_PATH="${{env.VCPKG_PATH}}"
     - name: Configure build
       run: >
         cmake
         -B ${{env.BUILD_DIR}}
         ${{matrix.extra_build_option}}
         -DCMAKE_INSTALL_PREFIX="${{env.INSTL_DIR}}"
-        -DCMAKE_PREFIX_PATH="${{env.VCPKG_PATH}}"
         -DUMF_BUILD_SHARED_LIBRARY=ON
         -DUMF_BUILD_BENCHMARKS=ON
         -DUMF_BUILD_BENCHMARKS_MT=ON
@@ -120,7 +120,7 @@ jobs:
     #   run: cmake --build ${{env.BUILD_DIR}} --config Release -j $Env:NUMBER_OF_PROCESSORS
 
     - name: Checkout UR
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         repository: oneapi-src/unified-runtime
         path: ur-repo
