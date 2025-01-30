@@ -86,7 +86,7 @@ jobs:
 
     - name: Check where isnstalled
       run: |
-        dpkg -L libhwloc-dev
+        dpkg -L libjemalloc-dev
 
     - name: Configure build
       run: >
