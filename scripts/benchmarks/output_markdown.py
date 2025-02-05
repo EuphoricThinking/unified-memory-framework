@@ -91,13 +91,14 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
         best_value = None
         best_key = None
 
-        # Determine the best value
+        # Determine the best value for the given benchmark, among the results from all saved runs specified by --compare
         for key, res in results.items():
             if best_value is None or (res.lower_is_better and res.value < best_value) or (not res.lower_is_better and res.value > best_value):
                 best_value = res.value
                 best_key = key
 
-        # Generate the row with the best value highlighted
+        # Generate the row with all the results from saved runs specified by --compare,
+        # Highight the best value in the row with data
         if options.verbose: print(f"Results: {results}")
         for key in chart_data.keys():
             if key in results:
@@ -128,7 +129,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
                     diff = v0/v1
 
                 if diff != None:
-                    oln.row += f"{(diff * 100):.2f}%"
+                    oln.row += f" LALAAA {(diff * 100):.2f}%"
                     oln.diff = diff
 
         output_detailed_list.append(oln)
