@@ -14,6 +14,8 @@ class OutputLine:
         self.diff = None
         self.bars = None
         self.row = ""
+        self.suite = "Uknown"
+        self.explicit_group = ""
 
     def __str__(self):
         return f"(Label:{self.label}, diff:{self.diff})"
@@ -67,14 +69,19 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
     print("chart keys", chart_data.keys())
 
     # Collect all benchmarks and their results
+    # key: benchmark name, value: dict(run_name : single_result_in_the_given_run)
     benchmark_results = collections.defaultdict(dict)
+    debug = None
+    # key: run name, results: results from different benchmarks collected in the named run
     for key, results in chart_data.items():
         # print("k", key, "r", results)
         for res in results:
             # print("res", res)
+            debug = res.name
             benchmark_results[res.name][key] = res
 
     print("ben len", len(benchmark_results))
+    print(benchmark_results.keys(), "\n", len(benchmark_results[debug]),  "\n", benchmark_results[debug], "\n", benchmark_results[debug]["baseline"])
     # Generate the table rows
     output_detailed_list = []
 
@@ -85,14 +92,25 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
     # regressed = 0
     no_change = 0
 
+    suite_dicts = collections.defaultdict(list)
+
     for bname, results in benchmark_results.items():
         oln = OutputLine(bname)
         oln.row = f"| {bname} |"
         best_value = None
         best_key = None
 
+        are_suite_group_assigned = False
+
         # Determine the best value for the given benchmark, among the results from all saved runs specified by --compare
+        # key: run name, res: single result collected in the given run
         for key, res in results.items():
+            if not are_suite_group_assigned:
+                oln.suite = res.suite
+                oln.explicit_group = res.explicit_group
+
+                are_suite_group_assigned = True
+
             if best_value is None or (res.lower_is_better and res.value < best_value) or (not res.lower_is_better and res.value > best_value):
                 best_value = res.value
                 best_key = key
@@ -129,8 +147,11 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
                     diff = v0/v1
 
                 if diff != None:
-                    oln.row += f" LALAAA {(diff * 100):.2f}%"
+                    oln.row += f" {(diff * 100):.2f}%"
                     oln.diff = diff
+
+        # if representative is not None:
+        #     oln.suite = representative.s
 
         output_detailed_list.append(oln)
 
@@ -190,15 +211,9 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
             if options.verbose: print(oln.row)
             summary_table += oln.row + "\n"
 
-    grouped_objects = collections.defaultdict(list)
     regressed_rows.reverse()
 
-    for oln in output_detailed_list:
-        s = oln.label
-        prefix = re.match(r'^[^_\s]+', s)[0]
-        grouped_objects[prefix].append(oln)
-
-    grouped_objects = dict(grouped_objects)
+    # grouped_objects = dict(grouped_objects)
 
     # print("mean:", mean_cnt)
     # if mean_cnt > 0:
@@ -253,37 +268,48 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 
     summary_table = "\n## Performance change in benchmark groups\n"
 
-    for name, outgroup in grouped_objects.items():
-        outgroup_s = sorted(outgroup, key=lambda x: (x.diff is not None, x.diff), reverse=True)
-        product = 1.0
-        n = len(outgroup_s)
-        r = 0
-        for oln in outgroup_s:
-            if oln.diff != None:
-                product *= oln.diff
-                r += 1
-        if r > 0:
-            summary_table += f"""
+    grouped_in_suites = collections.defaultdict(lambda: collections.defaultdict(list))
+    for oln in output_detailed_list:
+        # s = oln.label
+        # prefix = re.match(r'^[^_\s]+', s)[0]
+        grouped_in_suites[oln.suite][oln.explicit_group].append(oln)
+
+    
+    for suite_name, suite_groups in grouped_in_suites.items():
+        summary_table += f"<details><summary>{suite_name}</summary>\n\n"
+
+        for name, outgroup in suite_groups.items():
+            outgroup_s = sorted(outgroup, key=lambda x: (x.diff is not None, x.diff), reverse=True)
+            product = 1.0
+            n = len(outgroup_s)
+            r = 0
+            for oln in outgroup_s:
+                if oln.diff != None:
+                    product *= oln.diff
+                    r += 1
+            if r > 0:
+                summary_table += f"""
 <details>
 <summary> Relative perf in group {name} ({n}): {math.pow(product, 1/r)*100:.3f}% </summary>
 
 """
-        else:
-            summary_table += f"""
+            else:
+                summary_table += f"""
 <details>
 <summary> Relative perf in group {name} ({n}): cannot calculate </summary>
 
 """
-        summary_table += "| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
-        summary_table += "|---" * (len(chart_data) + 3) + "|\n"
+            summary_table += "| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+            summary_table += "|---" * (len(chart_data) + 3) + "|\n"
 
-        for oln in outgroup_s:
-            summary_table += f"{oln.row}\n"
+            for oln in outgroup_s:
+                summary_table += f"{oln.row}\n"
 
-        summary_table += f"""
+            summary_table += f"""
 </details>
 
 """
+        summary_table += "</details>"
 
     return summary_line, summary_table
 
