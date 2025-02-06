@@ -11,7 +11,7 @@ import math
 class OutputLine:
     def __init__(self, name):
         self.label = name
-        self.diff = None
+        self.diff = {}
         self.bars = None
         self.row = ""
         self.suite = "Uknown"
@@ -23,12 +23,23 @@ class OutputLine:
     def __repr__(self):
         return self.__str__()
 
-# Benchmark_name, relative performance value in given units
-num_info_columns = 3
+# Number of columns independent of number of run names:
+# Benchmark run
+num_independent_info_columns = 1
+
+# Number of columns per run:
+# Change
+num_dependent_info_columns = 3
     
-def get_chart_markdown_header(chart_data: dict[str, list[Result]]):
-    summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
-    summary_header += "|---" * (len(chart_data) + num_info_columns) + "|\n"
+def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name: str):
+    summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) # + " | Relative perf | Change |\n"
+
+    for run_name in chart_data.keys():
+        if run_name != baseline_name:
+            summary_header += f" | Change {baseline_name} vs {run_name}"
+    summary_header += "|\n"
+    
+    summary_header += "|---" * (len(chart_data) * num_dependent_info_columns) + "|\n"
 
     return summary_header
 
@@ -62,8 +73,8 @@ def generate_markdown_details(results: list[Result]):
 """)
     return "\n".join(markdown_sections)
 
-def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
-    summary_table = get_chart_markdown_header(chart_data=chart_data) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str):
+    summary_table = get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
     # summary_table += "|---" * (len(chart_data) + 2) + "|\n"
     print("len chart data", len(chart_data))
     print("chart keys", chart_data.keys())
@@ -92,7 +103,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
     # regressed = 0
     no_change = 0
 
-    suite_dicts = collections.defaultdict(list)
+    # suite_dicts = collections.defaultdict(list)
 
     for bname, results in benchmark_results.items():
         oln = OutputLine(bname)
@@ -105,6 +116,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
         # Determine the best value for the given benchmark, among the results from all saved runs specified by --compare
         # key: run name, res: single result collected in the given run
         for key, res in results.items():
+            # Choose the first representative, since suite and explicit_groups should be identical across runs
             if not are_suite_group_assigned:
                 oln.suite = res.suite
                 oln.explicit_group = res.explicit_group
@@ -132,23 +144,30 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
         # key0 = list(chart_data.keys())[0]
         # key1 = list(chart_data.keys())[1]
         # print("k0 in results", key0 in results, "k1 in results", key1 in results)
-        if len(chart_data.keys()) == 2:
-            key0 = list(chart_data.keys())[0]
-            key1 = list(chart_data.keys())[1]
-            print("k0 in results", key0 in results, "k1 in results", key1 in results)
-            if (key0 in results) and (key1 in results):
-                v0 = results[key0].value
-                v1 = results[key1].value
-                diff = None
-                print("v0", v0, "v1", v1)
-                if v0 != 0 and results[key0].lower_is_better:
-                    diff = v1/v0
-                elif v1 != 0 and not results[key0].lower_is_better:
-                    diff = v0/v1
+        # calculate relative performance difference between baseline and other runs
+        if len(chart_data.keys()) >= 2 and (baseline_name in results):
+            # key0 = list(chart_data.keys())[0]
+            # key1 = list(chart_data.keys())[1]
+            # print("k0 in results", key0 in results, "k1 in results", key1 in results)
+            # key0 = baseline_name
+            for other_run in chart_data.keys(): #key1
+                if other_run != baseline_name and  (other_run in results):
+                    baseline_val = results[baseline_name].value
+                    other_val = results[other_run].value
+                    diff = None
+                    # print("v0", v0, "v1", v1)
+                    if baseline_val != 0 and results[baseline_name].lower_is_better:
+                        diff = other_val / baseline_val
+                    elif other_val != 0 and not results[baseline_name].lower_is_better:
+                        diff = baseline_val / other_val
 
-                if diff != None:
-                    oln.row += f" {(diff * 100):.2f}%"
-                    oln.diff = diff
+                    if diff != None:
+                        # oln.row += f" {(diff * 100):.2f}%" # relative perf
+                        # oln.diff = diff
+                        oln.diff[other_run] = diff
+            # else:
+            #     for _ in range(len(chart_data)):
+            #         oln.row += " | | "
 
         # if representative is not None:
         #     oln.suite = representative.s
