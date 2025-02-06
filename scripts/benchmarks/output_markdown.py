@@ -110,10 +110,10 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
             else:
                 oln.row += " - |"
 
-        print("keys", chart_data.keys())
-        key0 = list(chart_data.keys())[0]
-        key1 = list(chart_data.keys())[1]
-        print("k0 in results", key0 in results, "k1 in results", key1 in results)
+        # print("keys", chart_data.keys())
+        # key0 = list(chart_data.keys())[0]
+        # key1 = list(chart_data.keys())[1]
+        # print("k0 in results", key0 in results, "k1 in results", key1 in results)
         if len(chart_data.keys()) == 2:
             key0 = list(chart_data.keys())[0]
             key1 = list(chart_data.keys())[1]
@@ -244,7 +244,7 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
             summary_line += row #+ "\n"
         
         summary_line += "\n</details>"
-        
+
     if not is_at_least_one_diff:
         summary_line = f"No diffs to calculate performance change"
 
