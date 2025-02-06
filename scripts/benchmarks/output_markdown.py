@@ -149,7 +149,6 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
     improved_rows = []
     regressed_rows = []
     print("diff values len", len(diff_values))
-    is_at_least_one_diff = False
     if len(diff_values) > 0:
         # max_diff = max(max(diff_values) - 1, 1 - min(diff_values))
 
@@ -167,7 +166,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
                 #     oln.row += f" | {'-' * (-oln.bars)} |"
 
                 # mean_cnt += 1
-                is_at_least_one_diff = True
+                # is_at_least_one_diff = True
                 if abs(delta) > options.epsilon:
                     if delta > 0:
                         # improved+=1
@@ -203,47 +202,50 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
 
     # print("mean:", mean_cnt)
     # if mean_cnt > 0:
-    if is_at_least_one_diff:
+    is_at_least_one_diff = False
         # global_mean = global_product ** (1/mean_cnt)
         # summary_line = f"Total {mean_cnt} benchmarks in mean. "
         # summary_line += "\n" + f"Geomean {global_mean*100:.3f}%. \nImproved {improved} Regressed {regressed} (threshold {options.epsilon*100:.2f}%)"
         # print("enter summary line")
-        summary_line = '' #'\n'
-        
-        if len(improved_rows) > 0:
-            summary_line += f"""
+    summary_line = '' #'\n'
+    
+    if len(improved_rows) > 0:
+        is_at_least_one_diff = True
+        summary_line += f"""
 <details>
 <summary>        
 Improved {len(improved_rows)} (threshold {options.epsilon*100:.2f}%) 
 </summary>
 
 """
-            summary_line += get_chart_markdown_header(chart_data=chart_data) 
-            #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
-            # summary_line += "|---" * (len(chart_data) + 4) + "|\n"
+        summary_line += get_chart_markdown_header(chart_data=chart_data) 
+        #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+        # summary_line += "|---" * (len(chart_data) + 4) + "|\n"
 
-            for row in improved_rows:
-                summary_line += row #+ "\n"
+        for row in improved_rows:
+            summary_line += row #+ "\n"
 
-            summary_line += "\n</details>"
-        
-        if len(regressed_rows) > 0:
-            summary_line += f"""
+        summary_line += "\n</details>"
+    
+    if len(regressed_rows) > 0:
+        is_at_least_one_diff = True
+        summary_line += f"""
 <details>
 <summary>        
 Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary>
 
 """
-        
-            summary_line += get_chart_markdown_header(chart_data=chart_data) 
-            #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
-            # summary_line += "|---" * (len(chart_data) + 2) + "|\n"
+    
+        summary_line += get_chart_markdown_header(chart_data=chart_data) 
+        #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+        # summary_line += "|---" * (len(chart_data) + 2) + "|\n"
 
-            for row in regressed_rows:
-                summary_line += row #+ "\n"
-            
-            summary_line += "\n</details>"
-    else:
+        for row in regressed_rows:
+            summary_line += row #+ "\n"
+        
+        summary_line += "\n</details>"
+        
+    if not is_at_least_one_diff:
         summary_line = f"No diffs to calculate performance change"
 
     if options.verbose: print(summary_line)
