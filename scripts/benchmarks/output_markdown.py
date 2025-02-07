@@ -36,6 +36,10 @@ num_info_columns = 1
 # for this script would be comparing the performance of PR with the main branch
 num_baselines_required_for_rel_change = 2
 
+# Maximum number of characters that is allowed in request validation
+# for posting comments in GitHub PR
+max_markdown_size = 65536
+
 def is_relative_perf_comparison_to_be_performed(chart_data: dict[str, list[Result]], baseline_name: str):
     return (len(chart_data) == num_baselines_required_for_rel_change) and(baseline_name in chart_data.keys())
     
@@ -62,8 +66,14 @@ def get_main_branch_run_name(chart_data: dict[str, list[Result]], baseline_name:
         
     return None
 
+def get_available_markdown_size(current_markdown_size: int):
+    return max(0, max_markdown_size - current_markdown_size)
+
+def is_content_in_size_limit(content_size: int, current_markdown_size: int):
+    return content_size <= get_available_markdown_size(current_markdown_size)
+
 # Function to generate the markdown collapsible sections for each variant
-def generate_markdown_details(results: list[Result]):
+def generate_markdown_details(results: list[Result], current_markdown_size: int, is_output_always_full: bool):
     markdown_sections = []
     # print("results all", len(results))
     # print("first res", results[0])
@@ -109,9 +119,18 @@ def generate_markdown_details(results: list[Result]):
     markdown_sections.append(f"""
 </details>
 """)
-    return "\n".join(markdown_sections)
+    
+    full_markdown = "\n".join(markdown_sections)
 
-def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str):
+    if is_output_always_full:
+        return full_markdown
+    else:
+        if is_content_in_size_limit(len(full_markdown), current_markdown_size):
+            return full_markdown
+        else:
+            return "\nBenchmark details contain too many chars to display"
+
+def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str, is_output_always_full: bool):
     summary_table = get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
     # summary_table += "|---" * (len(chart_data) + 2) + "|\n"
     print("len chart data", len(chart_data))
@@ -361,10 +380,25 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 """
         summary_table += "</details>"
 
-    return summary_line, summary_table
+    if is_output_always_full:
+        return summary_line, summary_table
+    else:
+        if is_content_in_size_limit(content_size=len(summary_table), current_markdown_size=len(summary_line)):
+            return summary_line, summary_table
+        else:
+            if is_content_in_size_limit(content_size=len(summary_line), current_markdown_size=0):
+                return summary_line
+            else:
+                return f"""
+# Summary
+Benchmark output is too large to display
 
-def generate_markdown(name: str, chart_data: dict[str, list[Result]]):
-    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data, name)
+"""
+
+def generate_markdown(name: str, chart_data: dict[str, list[Result]], is_output_always_full: bool):
+    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data, name, is_output_always_full)
+
+    current_markdown_size = len(summary_line) + len(summary_table)
 
     generated_markdown = f"""
 # Summary
@@ -375,6 +409,6 @@ def generate_markdown(name: str, chart_data: dict[str, list[Result]]):
     if name in chart_data.keys():
         generated_markdown += f"""
 # Details
-{generate_markdown_details(chart_data[name])}
+{generate_markdown_details(chart_data[name], current_markdown_size, is_output_always_full)}
 """
     return generated_markdown
