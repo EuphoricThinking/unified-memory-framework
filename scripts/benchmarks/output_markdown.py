@@ -38,10 +38,10 @@ num_baselines_required_for_rel_change = 2
 def is_relative_perf_comparison_to_be_performed(chart_data: dict[str, list[Result]], baseline_name: str):
     return (len(chart_data) == num_baselines_required_for_rel_change) and(baseline_name in chart_data.keys())
     
-def get_chart_markdown_header(chart_data: dict[str, list[Result]]):
+def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name: str):
     summary_header = ''
 
-    if len(chart_data) == num_baselines_required_for_rel_change:
+    if is_relative_perf_comparison_to_be_performed(chart_data, baseline_name):
         summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Change |\n"
     else:
         summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " |\n"
@@ -81,7 +81,7 @@ def generate_markdown_details(results: list[Result]):
     return "\n".join(markdown_sections)
 
 def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str):
-    summary_table = get_chart_markdown_header(chart_data=chart_data) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+    summary_table = get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
     # summary_table += "|---" * (len(chart_data) + 2) + "|\n"
     print("len chart data", len(chart_data))
     print("chart keys", chart_data.keys())
@@ -150,19 +150,19 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
         # key0 = list(chart_data.keys())[0]
         # key1 = list(chart_data.keys())[1]
         # print("k0 in results", key0 in results, "k1 in results", key1 in results)
-        if len(chart_data) == num_baselines_required_for_rel_change and baseline_name in results:
-            key0 = list(chart_data.keys())[0]
-            key1 = list(chart_data.keys())[1]
-            print("k0 in results", key0 in results, "k1 in results", key1 in results)
-            if (key0 in results) and (key1 in results):
-                v0 = results[key0].value
-                v1 = results[key1].value
+        if is_relative_perf_comparison_to_be_performed(chart_data, baseline_name):
+            pr_key = list(chart_data.keys())[0]
+            main_key = list(chart_data.keys())[1]
+            # print("k0 in results", key0 in results, "k1 in results", key1 in results)
+            if (pr_key in results) and (main_key in results):
+                pr_val = results[pr_key].value
+                main_val = results[main_key].value
                 diff = None
-                print("v0", v0, "v1", v1)
-                if v0 != 0 and results[key0].lower_is_better:
-                    diff = v1/v0
-                elif v1 != 0 and not results[key0].lower_is_better:
-                    diff = v0/v1
+                # print("v0", v0, "v1", v1)
+                if pr_val != 0 and results[pr_key].lower_is_better:
+                    diff = main_val / pr_val
+                elif main_val != 0 and not results[pr_key].lower_is_better:
+                    diff = pr_val / main_val
 
                 if diff != None:
                     oln.row += f" {(diff * 100):.2f}%"
@@ -251,7 +251,7 @@ Improved {len(improved_rows)} (threshold {options.epsilon*100:.2f}%)
 </summary>
 
 """
-        summary_line += get_chart_markdown_header(chart_data=chart_data) 
+        summary_line += get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) 
         #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
         # summary_line += "|---" * (len(chart_data) + 4) + "|\n"
 
@@ -269,7 +269,7 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 
 """
     
-        summary_line += get_chart_markdown_header(chart_data=chart_data) 
+        summary_line += get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) 
         #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
         # summary_line += "|---" * (len(chart_data) + 2) + "|\n"
 
