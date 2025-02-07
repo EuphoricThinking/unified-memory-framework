@@ -14,7 +14,7 @@ class OutputLine:
         self.diff = None
         self.bars = None
         self.row = ""
-        self.suite = "Uknown"
+        self.suite = "Unknown"
         self.explicit_group = ""
 
     def __str__(self):
@@ -38,15 +38,18 @@ num_baselines_required_for_rel_change = 2
 def is_relative_perf_comparison_to_be_performed(chart_data: dict[str, list[Result]], baseline_name: str):
     return (len(chart_data) == num_baselines_required_for_rel_change) and(baseline_name in chart_data.keys())
     
+
 def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name: str):
     summary_header = ''
+    final_num_columns = num_info_columns
 
     if is_relative_perf_comparison_to_be_performed(chart_data, baseline_name):
         summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Change |\n"
+        final_num_columns += 1
     else:
         summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " |\n"
 
-    summary_header += "|---" * (len(chart_data) + num_info_columns) + "|\n"
+    summary_header += "|---" * (len(chart_data) + final_num_columns) + "|\n"
 
     return summary_header
 
@@ -336,8 +339,8 @@ def generate_markdown(name: str, chart_data: dict[str, list[Result]]):
 
     generated_markdown = f"""
 # Summary
+(<ins>Emphasized values</ins> are the best results)\n
 {summary_line}\n
-(<ins>result</ins> is better)\n
 {summary_table}
 """
     if name in chart_data.keys():
