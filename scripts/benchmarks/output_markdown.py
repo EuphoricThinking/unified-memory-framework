@@ -55,12 +55,18 @@ def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name
     return summary_header
 
 
+def get_main_branch_run_name(chart_data: dict[str, list[Result]], baseline_name: str):
+    for key in chart_data.keys():
+        if key != baseline_name:
+            return key
+        
+    return None
 
 # Function to generate the markdown collapsible sections for each variant
 def generate_markdown_details(results: list[Result]):
     markdown_sections = []
-    print("results all", len(results))
-    print("first res", results[0])
+    # print("results all", len(results))
+    # print("first res", results[0])
     # print("res keys", results.keys())
     markdown_sections.append(f"""
 <details>
@@ -168,8 +174,9 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
         # key1 = list(chart_data.keys())[1]
         # print("k0 in results", key0 in results, "k1 in results", key1 in results)
         if is_relative_perf_comparison_to_be_performed(chart_data, baseline_name):
-            pr_key = list(chart_data.keys())[0]
-            main_key = list(chart_data.keys())[1]
+            # pr_key = list(chart_data.keys())[0]
+            pr_key = baseline_name
+            main_key = get_main_branch_run_name(chart_data, baseline_name) #list(chart_data.keys())[1]
             # print("k0 in results", key0 in results, "k1 in results", key1 in results)
             if (pr_key in results) and (main_key in results):
                 pr_val = results[pr_key].value
