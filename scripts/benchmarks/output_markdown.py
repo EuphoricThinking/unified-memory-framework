@@ -165,7 +165,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
                     diff = pr_val / main_val
 
                 if diff != None:
-                    oln.row += f" {(diff * 100):.2f}%"
+                    # oln.row += f" {(diff * 100):.2f}%"
                     oln.diff = diff
 
         # if representative is not None:
@@ -194,7 +194,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
         for oln in sorted_detailed_list:
             if oln.diff != None:
                 # print("Not none diff")
-                oln.row += f" | {(oln.diff - 1)*100:.2f}%"
+                oln.row += f" {(oln.diff - 1)*100:.2f}%"
                 delta = oln.diff - 1
                 # oln.bars = round(10*(oln.diff - 1)/max_diff) if max_diff != 0.0 else 0
                 # if oln.bars == 0 or abs(delta) < options.epsilon:
@@ -217,16 +217,16 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
                     no_change+=1
 
                 # global_product *= oln.diff
-            else:
-                # print("diff is None for", oln.row)
-                oln.row += " |   |"
+            # else:
+            #     # print("diff is None for", oln.row)
+            #     oln.row += "   |"
 
             if options.verbose: print(oln.row)
             summary_table += oln.row + "\n"
     else:
         for oln in sorted_detailed_list:
-            oln.row += " |   |"
-            if options.verbose: print(oln.row)
+            # oln.row += "  |"
+            # if options.verbose: print(oln.row)
             summary_table += oln.row + "\n"
 
     regressed_rows.reverse()
@@ -317,8 +317,8 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 <summary> Relative perf in group {name} ({n}): cannot calculate </summary>
 
 """
-            summary_table += "| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
-            summary_table += "|---" * (len(chart_data) + 3) + "|\n"
+            summary_table += get_chart_markdown_header(chart_data, baseline_name) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+            #summary_table += "|---" * (len(chart_data) + 3) + "|\n"
 
             for oln in outgroup_s:
                 summary_table += f"{oln.row}\n"
