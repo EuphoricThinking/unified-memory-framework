@@ -86,18 +86,26 @@ def generate_markdown_details(results: list[Result]):
             command = ast.literal_eval(res.command)
 
         env_vars_str = '\n'.join(f"{key}={value}" for key, value in env_dict.items()) # res.env.items())
-        markdown_sections.append(f"""
+        section = f"""
 <details>
 <summary>{res.label}</summary>
-
-#### Environment Variables:
-{env_vars_str}
 
 #### Command:
 {' '.join(command)}
 
+"""
+        if env_dict:
+            section += f"""
+#### Environment Variables:
+{env_vars_str}
+
+"""
+        section += f"""
 </details>
-""")
+"""
+            
+        markdown_sections.append(section)
+
     markdown_sections.append(f"""
 </details>
 """)
