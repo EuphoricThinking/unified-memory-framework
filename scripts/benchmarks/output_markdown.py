@@ -23,11 +23,20 @@ class OutputLine:
     def __repr__(self):
         return self.__str__()
 
-# Benchmark_name, relative performance value in given units
-num_info_columns = 3
+# Independent of the chart_data content number of required columns in the markdown table:
+# Benchmark_name
+#
+# optional +1: relative performance value in given units
+num_info_columns = 1
+
+# Number of columns required for relative performance change calculation
+# In case of multiple provided saved baseline to compare, the relative
+# performance is not calculated, since the base (hopefully) usage case 
+# for this script would be comparing the performance of PR with the main branch
+num_baselines_required_for_rel_change = 2
     
 def get_chart_markdown_header(chart_data: dict[str, list[Result]]):
-    summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
+    summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Change |\n"
     summary_header += "|---" * (len(chart_data) + num_info_columns) + "|\n"
 
     return summary_header
