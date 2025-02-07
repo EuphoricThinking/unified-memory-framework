@@ -34,9 +34,18 @@ num_info_columns = 1
 # performance is not calculated, since the base (hopefully) usage case 
 # for this script would be comparing the performance of PR with the main branch
 num_baselines_required_for_rel_change = 2
+
+def is_relative_perf_comparison_to_be_performed(chart_data: dict[str, list[Result]], baseline_name: str):
+    return (len(chart_data) == num_baselines_required_for_rel_change) and(baseline_name in chart_data.keys())
     
 def get_chart_markdown_header(chart_data: dict[str, list[Result]]):
-    summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Change |\n"
+    summary_header = ''
+
+    if len(chart_data) == num_baselines_required_for_rel_change:
+        summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " | Change |\n"
+    else:
+        summary_header = "| Benchmark | " + " | ".join(chart_data.keys()) + " |\n"
+
     summary_header += "|---" * (len(chart_data) + num_info_columns) + "|\n"
 
     return summary_header
@@ -101,7 +110,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
     # regressed = 0
     no_change = 0
 
-    suite_dicts = collections.defaultdict(list)
+    # suite_dicts = collections.defaultdict(list)
 
     for bname, results in benchmark_results.items():
         oln = OutputLine(bname)
@@ -141,7 +150,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
         # key0 = list(chart_data.keys())[0]
         # key1 = list(chart_data.keys())[1]
         # print("k0 in results", key0 in results, "k1 in results", key1 in results)
-        if len(chart_data.keys()) == 2 and baseline_name in results:
+        if len(chart_data) == num_baselines_required_for_rel_change and baseline_name in results:
             key0 = list(chart_data.keys())[0]
             key1 = list(chart_data.keys())[1]
             print("k0 in results", key0 in results, "k1 in results", key1 in results)
