@@ -7,6 +7,7 @@ import collections, re
 from benches.result import Result
 from options import options
 import math
+import ast
 
 class OutputLine:
     def __init__(self, name):
@@ -58,14 +59,27 @@ def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name
 # Function to generate the markdown collapsible sections for each variant
 def generate_markdown_details(results: list[Result]):
     markdown_sections = []
-
+    print("results all", len(results))
+    print("first res", results[0])
+    # print("res keys", results.keys())
     markdown_sections.append(f"""
 <details>
 <summary>Benchmark details - environment, command...</summary>
 """)
 
     for res in results:
-        env_vars_str = '\n'.join(f"{key}={value}" for key, value in res.env.items())
+        
+        # print("res")
+        # print("res env", res.env)
+        env_dict = res.env
+        command = res.command
+
+        if isinstance(res.env, str):
+            env_dict = ast.literal_eval(res.env)
+        if isinstance(res.command, str):
+            command = ast.literal_eval(res.command)
+
+        env_vars_str = '\n'.join(f"{key}={value}" for key, value in env_dict.items()) # res.env.items())
         markdown_sections.append(f"""
 <details>
 <summary>{res.label}</summary>
@@ -74,7 +88,7 @@ def generate_markdown_details(results: list[Result]):
 {env_vars_str}
 
 #### Command:
-{' '.join(res.command)}
+{' '.join(command)}
 
 </details>
 """)
@@ -102,7 +116,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
             benchmark_results[res.name][key] = res
 
     print("ben len", len(benchmark_results))
-    print(benchmark_results.keys(), "\n", len(benchmark_results[debug]),  "\n", benchmark_results[debug], "\n", benchmark_results[debug]["baseline"])
+    # print(benchmark_results.keys(), "\n", len(benchmark_results[debug]),  "\n", benchmark_results[debug], "\n", benchmark_results[debug]["baseline"])
     # Generate the table rows
     output_detailed_list = []
 
@@ -186,7 +200,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
 
     diff_values = [oln.diff for oln in sorted_detailed_list if oln.diff is not None]
     # print("oln", oln, "\n")
-    print("diffs:", diff_values)
+    # print("diffs:", diff_values)
 
     improved_rows = []
     regressed_rows = []
