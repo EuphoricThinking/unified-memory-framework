@@ -62,7 +62,7 @@ def generate_markdown_details(results: list[Result]):
 """)
     return "\n".join(markdown_sections)
 
-def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
+def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str):
     summary_table = get_chart_markdown_header(chart_data=chart_data) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
     # summary_table += "|---" * (len(chart_data) + 2) + "|\n"
     print("len chart data", len(chart_data))
@@ -132,7 +132,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]]):
         # key0 = list(chart_data.keys())[0]
         # key1 = list(chart_data.keys())[1]
         # print("k0 in results", key0 in results, "k1 in results", key1 in results)
-        if len(chart_data.keys()) == 2:
+        if len(chart_data.keys()) == 2 and baseline_name in results:
             key0 = list(chart_data.keys())[0]
             key1 = list(chart_data.keys())[1]
             print("k0 in results", key0 in results, "k1 in results", key1 in results)
@@ -314,7 +314,7 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
     return summary_line, summary_table
 
 def generate_markdown(name: str, chart_data: dict[str, list[Result]]):
-    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data)
+    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data, name)
 
     generated_markdown = f"""
 # Summary
