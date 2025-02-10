@@ -110,7 +110,8 @@ jobs:
     - name: Checkout UR
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
-        repository: oneapi-src/unified-runtime
+        repository: EuphoricThinking/unified-runtime #oneapi-src/unified-runtime
+        ref: fa2eab8a9b762351f4994a7742902aff7db9f3ce
         path: ur-repo
         fetch-depth: 1
         fetch-tags: false
