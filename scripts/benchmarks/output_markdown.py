@@ -58,6 +58,19 @@ def get_chart_markdown_header(chart_data: dict[str, list[Result]], baseline_name
 
     return summary_header
 
+def get_improved_regressed_summary(is_improved: bool, rows_count: int):
+    title = "Improved"
+    if not is_improved:
+        title = "Regressed"
+
+    summary = ("\n<details>\n"
+            "<summary>\n"        
+            f"{title} {rows_count} "
+            f"(threshold {options.epsilon*100:.2f}%)\n" 
+            "</summary>\n\n")
+
+    return summary
+
 
 def get_main_branch_run_name(chart_data: dict[str, list[Result]], baseline_name: str):
     for key in chart_data.keys():
@@ -296,13 +309,21 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseli
     
     if len(improved_rows) > 0:
         is_at_least_one_diff = True
-        summary_line += f"""
-<details>
-<summary>        
-Improved {len(improved_rows)} (threshold {options.epsilon*100:.2f}%) 
-</summary>
+        summary_line += get_improved_regressed_summary(is_improved=True, rows_count=len(improved_rows))
+        
+        # ("\n<details>\n"
+        #                 "<summary>\n"        
+        #                 f"Improved {len(improved_rows)} "
+        #                 f"(threshold {options.epsilon*100:.2f}%)\n" 
+        #                 "</summary>\n\n")
 
-"""
+#         f"""
+# <details>
+# <summary>        
+# Improved {len(improved_rows)} (threshold {options.epsilon*100:.2f}%) 
+# </summary>
+
+# """
         summary_line += get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) 
         #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
         # summary_line += "|---" * (len(chart_data) + 4) + "|\n"
@@ -314,12 +335,14 @@ Improved {len(improved_rows)} (threshold {options.epsilon*100:.2f}%)
     
     if len(regressed_rows) > 0:
         is_at_least_one_diff = True
-        summary_line += f"""
-<details>
-<summary>        
-Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary>
+        summary_line += get_improved_regressed_summary(is_improved=False, rows_count=len(regressed_rows))
+        
+#         f"""
+# <details>
+# <summary>        
+# Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary>
 
-"""
+# """
     
         summary_line += get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) 
         #"\n\n| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
