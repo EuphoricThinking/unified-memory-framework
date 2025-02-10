@@ -78,10 +78,9 @@ def generate_markdown_details(results: list[Result], current_markdown_size: int,
     # print("results all", len(results))
     # print("first res", results[0])
     # print("res keys", results.keys())
-    markdown_sections.append(f"""
-<details>
-<summary>Benchmark details - environment, command...</summary>
-""")
+    markdown_start = ("\n<details>\n"
+                      "<summary>Benchmark details - environment, command...</summary>\n")
+    markdown_sections.append(markdown_start)
 
     for res in results:
         
@@ -96,31 +95,33 @@ def generate_markdown_details(results: list[Result], current_markdown_size: int,
             command = ast.literal_eval(res.command)
 
         env_vars_str = '\n'.join(f"{key}={value}" for key, value in env_dict.items()) # res.env.items())
-        section = f"""
-<details>
-<summary>{res.label}</summary>
+        section = ("\n<details>\n"
+                    f"<summary>{res.label}</summary>\n\n"
+                    f"#### Command:\n{' '.join(command)}\n\n")
+#         section = f"""
+# <details>
+# <summary>{res.label}</summary>
 
-#### Command:
-{' '.join(command)}
+# #### Command:
+# {' '.join(command)}
 
-"""
+# """
         if env_dict:
-            section += f"""
-#### Environment Variables:
-{env_vars_str}
+            section += (f"#### Environment Variables:\n {env_vars_str}\n")
+#             f"""
+# #### Environment Variables:
+# {env_vars_str}
 
-"""
-        section += f"""
-</details>
-"""
+# """
+        section += "\n</details>\n" #f"""
+# </details>
+# """
             
         markdown_sections.append(section)
 
-    markdown_sections.append(f"""
-</details>
-""")
+    markdown_sections.append("\n</details>\n")
     
-    full_markdown = "\n".join(markdown_sections)
+    full_markdown = "\n".join(markdown_sections) # without newline?
 
     if markdown_size == MarkdownSize.FULL:
         return full_markdown
