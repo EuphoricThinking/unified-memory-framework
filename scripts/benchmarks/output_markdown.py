@@ -449,15 +449,16 @@ def generate_markdown(name: str, chart_data: dict[str, list[Result]], markdown_s
 
     current_markdown_size = len(summary_line) + len(summary_table)
 
-    generated_markdown = f"""
-# Summary
-(<ins>Emphasized values</ins> are the best results)\n
-{summary_line}\n
-{summary_table}
-"""
+    generated_markdown = (
+        "\n# Summary\n"
+        "(<ins>Emphasized values</ins> are the best results)\n"
+        f"{summary_line}\n"
+        f"{summary_table}"
+    )
+
     if name in chart_data.keys():
-        generated_markdown += f"""
-# Details
-{generate_markdown_details(chart_data[name], current_markdown_size, markdown_size)}
-"""
+        generated_markdown += ("\n# Details\n"
+        f"{generate_markdown_details(chart_data[name], current_markdown_size, markdown_size)}\n"
+        )
+        
     return generated_markdown
