@@ -5,7 +5,7 @@
 
 import collections, re
 from benches.result import Result
-from options import options
+from options import options, MarkdownSize
 import math
 import ast
 
@@ -73,7 +73,7 @@ def is_content_in_size_limit(content_size: int, current_markdown_size: int):
     return content_size <= get_available_markdown_size(current_markdown_size)
 
 # Function to generate the markdown collapsible sections for each variant
-def generate_markdown_details(results: list[Result], current_markdown_size: int, is_output_always_full: bool):
+def generate_markdown_details(results: list[Result], current_markdown_size: int, markdown_size: MarkdownSize):
     markdown_sections = []
     # print("results all", len(results))
     # print("first res", results[0])
@@ -122,15 +122,15 @@ def generate_markdown_details(results: list[Result], current_markdown_size: int,
     
     full_markdown = "\n".join(markdown_sections)
 
-    if is_output_always_full:
+    if markdown_size == MarkdownSize.FULL:
         return full_markdown
     else:
         if is_content_in_size_limit(len(full_markdown), current_markdown_size):
             return full_markdown
         else:
-            return "\nBenchmark details contain too many chars to display"
+            return "\nBenchmark details contain too many chars to display\n"
 
-def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str, is_output_always_full: bool):
+def generate_summary_table_and_chart(chart_data: dict[str, list[Result]], baseline_name: str, markdown_size: MarkdownSize):
     summary_table = get_chart_markdown_header(chart_data=chart_data, baseline_name=baseline_name) #"| Benchmark | " + " | ".join(chart_data.keys()) + " | Relative perf | Change |\n"
     # summary_table += "|---" * (len(chart_data) + 2) + "|\n"
     print("len chart data", len(chart_data))
@@ -349,6 +349,8 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 
         for name, outgroup in suite_groups.items():
             outgroup_s = sorted(outgroup, key=lambda x: (x.diff is not None, x.diff), reverse=True)
+
+            # Geometric mean 
             product = 1.0
             n = len(outgroup_s)
             r = 0
@@ -380,7 +382,7 @@ Regressed {len(regressed_rows)} (threshold {options.epsilon*100:.2f}%) </summary
 """
         summary_table += "</details>"
 
-    if is_output_always_full:
+    if markdown_size == MarkdownSize.FULL:
         return summary_line, summary_table
     else:
         if is_content_in_size_limit(content_size=len(summary_table), current_markdown_size=len(summary_line)):
@@ -395,8 +397,8 @@ Benchmark output is too large to display
 
 """
 
-def generate_markdown(name: str, chart_data: dict[str, list[Result]], is_output_always_full: bool):
-    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data, name, is_output_always_full)
+def generate_markdown(name: str, chart_data: dict[str, list[Result]], markdown_size: MarkdownSize):
+    (summary_line, summary_table) = generate_summary_table_and_chart(chart_data, name, markdown_size)
 
     current_markdown_size = len(summary_line) + len(summary_table)
 
@@ -409,6 +411,6 @@ def generate_markdown(name: str, chart_data: dict[str, list[Result]], is_output_
     if name in chart_data.keys():
         generated_markdown += f"""
 # Details
-{generate_markdown_details(chart_data[name], current_markdown_size, is_output_always_full)}
+{generate_markdown_details(chart_data[name], current_markdown_size, markdown_size)}
 """
     return generated_markdown

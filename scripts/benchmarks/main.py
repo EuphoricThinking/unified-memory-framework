@@ -186,7 +186,8 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         print("complete.")
 
 
-    this_name = options.baseline_name #"This PR"
+    this_name = options.current_run_name #"This PR"
+    print(this_name)
     chart_data = {}
 
     if not options.dry_run:
@@ -209,7 +210,7 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
             chart_data[name] = compare_result.results
 
     if options.output_markdown:
-        markdown_content = generate_markdown(this_name, chart_data, options.is_markdown_full)
+        markdown_content = generate_markdown(this_name, chart_data, options.output_markdown)
 
         with open('benchmark_results.md', 'w') as file:
             file.write(markdown_content)
@@ -268,14 +269,14 @@ if __name__ == "__main__":
     parser.add_argument("--exit-on-failure", help='Exit on first failure.', action="store_true")
     parser.add_argument("--compare-type", type=str, choices=[e.value for e in Compare], help='Compare results against previously saved data.', default=Compare.LATEST.value)
     parser.add_argument("--compare-max", type=int, help='How many results to read for comparisions', default=options.compare_max)
+    parser.add_argument("--output-markdown", nargs='?', const=options.output_markdown, help='Specify whether markdown output should fit the content size limit for request validation')
     parser.add_argument("--output-html", help='Create HTML output', action="store_true", default=False)
-    parser.add_argument("--output-markdown", help='Create Markdown output', action="store_true", default=True)
     parser.add_argument("--dry-run", help='Do not run any actual benchmarks', action="store_true", default=False)
     parser.add_argument("--compute-runtime", nargs='?', const=options.compute_runtime_tag, help="Fetch and build compute runtime")
     parser.add_argument("--iterations-stddev", type=int, help="Max number of iterations of the loop calculating stddev after completed benchmark runs", default=options.iterations_stddev)
     parser.add_argument("--build-igc", help="Build IGC from source instead of using the OS-installed version", action="store_true", default=options.build_igc)
-    parser.add_argument("--relative-perf",  type=str, help="A name of results which should be used as a baseline for metrics calculation", default=options.baseline_name)
-    parser.add_argument("--full-markdown", help="Create full markdown file regardless of the final content size", default=options.is_markdown_full, action="store_true")
+    parser.add_argument("--relative-perf",  type=str, help="A name of results which should be used as a baseline for metrics calculation", default=options.current_run_name)
+    # parser.add_argument("--full-markdown", help="Create full markdown file regardless of the final content size", default=options.is_markdown_full, action="store_true")
     parser.add_argument("--new-base-name", help="New name of the default baseline to compare", type=str, default='')
 
     args = parser.parse_args()
@@ -293,14 +294,14 @@ if __name__ == "__main__":
     options.exit_on_failure = args.exit_on_failure
     options.compare = Compare(args.compare_type)
     options.compare_max = args.compare_max
-    options.output_html = args.output_html
     options.output_markdown = args.output_markdown
+    options.output_html = args.output_html
     options.dry_run = args.dry_run
     options.umf = args.umf
     options.iterations_stddev = args.iterations_stddev
     options.build_igc = args.build_igc
-    options.baseline_name = args.relative_perf
-    options.is_markdown_full = args.full_markdown
+    options.current_run_name = args.relative_perf
+    # options.is_markdown_full = args.full_markdown
 
     if args.build_igc and args.compute_runtime is None:
         parser.error("--build-igc requires --compute-runtime to be set")
@@ -309,6 +310,8 @@ if __name__ == "__main__":
         options.compute_runtime_tag = args.compute_runtime
 
     benchmark_filter = re.compile(args.filter) if args.filter else None
+
+    print("options markdown:", options.output_markdown)
 
     compare_names = args.compare
     if args.new_base_name != '':
