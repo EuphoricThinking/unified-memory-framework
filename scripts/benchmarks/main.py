@@ -143,9 +143,13 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
 
         if suite_benchmarks:
             print(f"Setting up {type(s).__name__}")
-            s.setup()
-            print(f"{type(s).__name__} setup complete.")
-            benchmarks += suite_benchmarks
+            try:
+                s.setup()
+            except:
+                print(f"{type(s).__name__} setup failed. Benchmarks won't be added.")
+            else:
+                print(f"{type(s).__name__} setup complete.")
+                benchmarks += suite_benchmarks
 
     for b in benchmarks:
         print(b.name())
@@ -186,13 +190,11 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
         print("complete.")
 
 
-    this_name = options.current_run_name #"This PR"
-    print(this_name)
+    this_name = options.current_run_name
     chart_data = {}
 
     if not options.dry_run:
         chart_data = {this_name : results}
-    print("this pr rest", chart_data)
 
     history = BenchmarkHistory(directory)
     # limit how many files we load.
@@ -204,9 +206,7 @@ def main(directory, additional_env_vars, save_name, compare_names, filter):
 
     for name in compare_names:
         compare_result = history.get_compare(name)
-        print("compara name:", name)
         if compare_result:
-            print(name, "is not None result") #, compare_result.results)
             chart_data[name] = compare_result.results
 
     if options.output_markdown:
@@ -275,8 +275,7 @@ if __name__ == "__main__":
     parser.add_argument("--compute-runtime", nargs='?', const=options.compute_runtime_tag, help="Fetch and build compute runtime")
     parser.add_argument("--iterations-stddev", type=int, help="Max number of iterations of the loop calculating stddev after completed benchmark runs", default=options.iterations_stddev)
     parser.add_argument("--build-igc", help="Build IGC from source instead of using the OS-installed version", action="store_true", default=options.build_igc)
-    parser.add_argument("--relative-perf",  type=str, help="A name of results which should be used as a baseline for metrics calculation", default=options.current_run_name)
-    # parser.add_argument("--full-markdown", help="Create full markdown file regardless of the final content size", default=options.is_markdown_full, action="store_true")
+    parser.add_argument("--relative-perf",  type=str, help="The name of the results which should be used as a baseline for metrics calculation", default=options.current_run_name)
     parser.add_argument("--new-base-name", help="New name of the default baseline to compare", type=str, default='')
 
     args = parser.parse_args()
@@ -301,7 +300,6 @@ if __name__ == "__main__":
     options.iterations_stddev = args.iterations_stddev
     options.build_igc = args.build_igc
     options.current_run_name = args.relative_perf
-    # options.is_markdown_full = args.full_markdown
 
     if args.build_igc and args.compute_runtime is None:
         parser.error("--build-igc requires --compute-runtime to be set")
@@ -310,8 +308,6 @@ if __name__ == "__main__":
         options.compute_runtime_tag = args.compute_runtime
 
     benchmark_filter = re.compile(args.filter) if args.filter else None
-
-    print("options markdown:", options.output_markdown)
 
     compare_names = args.compare
     if args.new_base_name != '':

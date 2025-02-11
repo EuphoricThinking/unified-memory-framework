@@ -37,7 +37,6 @@ class Options:
     compute_runtime_tag: str = '24.52.32224.10'
     build_igc: bool = False
     current_run_name: str = "This PR"
-    # is_markdown_full: bool = False
     default_baseline: str = "baseline"
 
 options = Options()
