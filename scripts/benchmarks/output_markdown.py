@@ -365,8 +365,9 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]],
         return summary_line, summary_table
     else:
         full_content_size = len(summary_table) + len(summary_line)
-        if is_content_in_size_limit(content_size=len(summary_table),
-                                     current_markdown_size=len(summary_line)):
+
+        if is_content_in_size_limit(content_size=full_content_size,
+                                     current_markdown_size=0):
             return summary_line, summary_table
         else:
             if is_content_in_size_limit(content_size=len(summary_line), 
