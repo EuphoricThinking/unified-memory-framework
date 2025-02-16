@@ -17,7 +17,7 @@ class OutputLine:
         self.bars = None
         self.row = ""
         self.suite = "Unknown"
-        self.explicit_group = ""
+        self.explicit_group = "Ungrouped"
 
     def __str__(self):
         return f"(Label:{self.label}, diff:{self.diff})"
@@ -85,22 +85,13 @@ def get_improved_regressed_summary(is_improved: bool, rows_count: int):
     return summary
 
 
-def get_relative_perf_summary(group_size: int, diffs_product: int, 
-                              root_for_geometric_mean: int, group_name: str):
+def get_relative_perf_summary(group_size: int, group_name: str):
     summary = (
             "\n<details>\n"
             f"<summary> Relative perf in group {group_name} " 
-            f"({group_size}): "
-            )
-
-    if root_for_geometric_mean > 0:
-        summary += \
-            (
-            f"{math.pow(diffs_product, 1 / root_for_geometric_mean)*100:.3f}% " 
+            f"({group_size})\n"
             "</summary>\n\n"
             )
-    else:
-        summary += "cannot calculate </summary>\n\n"
 
     return summary
 
@@ -147,14 +138,14 @@ def generate_markdown_details(results: list[Result],
         if isinstance(res.command, str):
             command = ast.literal_eval(res.command)
 
-        env_vars_str = '\n'.join(f"{key}={value}" 
-                                 for key, value in env_dict.items())
         section = ("\n<details>\n"
                     f"<summary>{res.label}</summary>\n\n"
                     "#### Command:\n" 
                     f"{' '.join(command)}\n\n")
         
         if env_dict:
+            env_vars_str = '\n'.join(f"{key}={value}" 
+                                 for key, value in env_dict.items())
             section += (f"#### Environment Variables:\n {env_vars_str}\n")
 
         section += "\n</details>\n" 
@@ -347,8 +338,6 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]],
                     root += 1
             summary_table += get_relative_perf_summary(
                                                     group_size=len(outgroup_s), 
-                                                    diffs_product=product,
-                                                    root_for_geometric_mean=root, 
                                                     group_name=name
                                                     )
             summary_table += get_chart_markdown_header(chart_data, 
