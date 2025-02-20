@@ -7,7 +7,6 @@
 import collections
 from benches.result import Result
 from options import options, MarkdownSize
-import math
 import ast
 
 class OutputLine:
@@ -17,7 +16,7 @@ class OutputLine:
         self.bars = None
         self.row = ""
         self.suite = "Unknown"
-        self.explicit_group = "Ungrouped"
+        self.explicit_group = ""
 
     def __str__(self):
         return f"(Label:{self.label}, diff:{self.diff})"
@@ -113,6 +112,15 @@ def is_content_in_size_limit(content_size: int, current_markdown_size: int):
     return content_size <= get_available_markdown_size(current_markdown_size)
 
 
+def get_explicit_group_name(result: Result):
+    explicit_group_name = result.explicit_group
+
+    if explicit_group_name != "":
+        return explicit_group_name
+    else:
+        return "Other"
+    
+
 # Function to generate the markdown collapsible sections for each variant
 def generate_markdown_details(results: list[Result], 
                               current_markdown_size: int, 
@@ -199,7 +207,7 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]],
         for key, res in results.items():
             if not are_suite_group_assigned:
                 oln.suite = res.suite
-                oln.explicit_group = res.explicit_group
+                oln.explicit_group = get_explicit_group_name(res)
 
                 are_suite_group_assigned = True
 
@@ -329,13 +337,6 @@ def generate_summary_table_and_chart(chart_data: dict[str, list[Result]],
             outgroup_s = sorted(outgroup, key=lambda x: 
                                 (x.diff is not None, x.diff), reverse=True)
 
-            # Geometric mean calculation
-            product = 1.0
-            root = 0
-            for oln in outgroup_s:
-                if oln.diff != None:
-                    product *= oln.diff
-                    root += 1
             summary_table += get_relative_perf_summary(
                                                     group_size=len(outgroup_s), 
                                                     group_name=name
