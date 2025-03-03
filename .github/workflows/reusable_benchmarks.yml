@@ -115,29 +115,29 @@ jobs:
       run: |
         pip install --force-reinstall -r ${{github.workspace}}/sycl-repo/unified-runtime/third_party/benchmark_requirements.txt
 
-    - name: Set core range and GPU mask
-      run: |
-        # Compute the core range for the second NUMA node; first node is for SYCL/UR jobs.
-        # Skip the first 4 cores - the kernel is likely to schedule more work on these.
-        CORES=$(lscpu | awk '
-          /NUMA node1 CPU|On-line CPU/ {line=$0}
-          END {
-            split(line, a, " ")
-            split(a[4], b, ",")
-            sub(/^0/, "4", b[1])
-            print b[1]
-          }')
-        echo "Selected core: $CORES"
-        echo "CORES=$CORES" >> $GITHUB_ENV
+    # - name: Set core range and GPU mask
+    #   run: |
+    #     # Compute the core range for the second NUMA node; first node is for SYCL/UR jobs.
+    #     # Skip the first 4 cores - the kernel is likely to schedule more work on these.
+    #     CORES=$(lscpu | awk '
+    #       /NUMA node1 CPU|On-line CPU/ {line=$0}
+    #       END {
+    #         split(line, a, " ")
+    #         split(a[4], b, ",")
+    #         sub(/^0/, "4", b[1])
+    #         print b[1]
+    #       }')
+    #     echo "Selected core: $CORES"
+    #     echo "CORES=$CORES" >> $GITHUB_ENV
 
-        ZE_AFFINITY_MASK=1
-        echo "ZE_AFFINITY_MASK=$ZE_AFFINITY_MASK" >> $GITHUB_ENV
+    #     ZE_AFFINITY_MASK=1
+    #     echo "ZE_AFFINITY_MASK=$ZE_AFFINITY_MASK" >> $GITHUB_ENV
 
     - name: Run UMF benchmarks
       id: benchmarks
       working-directory: ${{env.BUILD_DIR}}
       run: >
-        taskset -c ${{ env.CORES }} ${{ github.workspace }}/sycl-repo/unified-runtime/scripts/benchmarks/main.py
+        ${{ github.workspace }}/sycl-repo/unified-runtime/scripts/benchmarks/main.py
         ~/bench_workdir_umf
         --umf ${{env.BUILD_DIR}}
         --compare baseline
