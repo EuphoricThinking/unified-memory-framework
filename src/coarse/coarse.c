@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Intel Corporation
+ * Copyright (C) 2024-2025 Intel Corporation
  *
  * Under the Apache License v2.0 with LLVM Exceptions. See LICENSE.TXT.
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -278,7 +278,7 @@ static block_t *node_list_rm_first(ravl_free_blocks_head_t *head_node,
     assert(node->prev == NULL);
     struct block_t *block = node->block;
 
-    if (IS_NOT_ALIGNED(block->size, alignment)) {
+    if (IS_NOT_ALIGNED(((uintptr_t)block->data), alignment)) {
         return NULL;
     }
 
@@ -303,7 +303,7 @@ static block_t *node_list_rm_with_alignment(ravl_free_blocks_head_t *head_node,
 
     ravl_free_blocks_elem_t *node;
     for (node = head_node->head; node != NULL; node = node->next) {
-        if (IS_ALIGNED(node->block->size, alignment)) {
+        if (IS_ALIGNED(((uintptr_t)node->block->data), alignment)) {
             return node_list_rm(head_node, node);
         }
     }
@@ -1170,10 +1170,13 @@ umf_result_t coarse_free(coarse_t *coarse, void *ptr, size_t bytes) {
     }
 
     block_t *block = get_node_block(node);
-    assert(block->used);
+    if (!block->used) {
+        LOG_ERR("double free");
+        utils_mutex_unlock(&coarse->lock);
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
+    }
 
     if (bytes > 0 && bytes != block->size) {
-        // wrong size of allocation
         LOG_ERR("wrong size of allocation");
         utils_mutex_unlock(&coarse->lock);
         return UMF_RESULT_ERROR_INVALID_ARGUMENT;
