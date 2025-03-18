@@ -225,8 +225,7 @@ class GBench(ComputeUMFBenchmark):
                 statistics = None
                 is_row_matched_to_statistics_type = False
 
-                if not self.is_memory_overhead_checked \
-                and not self.is_memory_statistics_included(row):
+                if not self.is_memory_overhead_checked:
                     statistics = self.get_mean(row)
                     is_row_matched_to_statistics_type = True
 
@@ -240,6 +239,8 @@ class GBench(ComputeUMFBenchmark):
                 and self.is_memory_statistics_included(row):
                     statistics = self.get_memory_overhead(row)
                     is_row_matched_to_statistics_type = True
+
+                print(statistics, is_row_matched_to_statistics_type)
 
                 if is_row_matched_to_statistics_type:
                     results.append((config, pool, statistics))
