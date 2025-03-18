@@ -151,7 +151,7 @@ class GBench(ComputeUMFBenchmark):
 
         self.col_statistics_time = self.col_real_time
 
-    def is_memory_statistics_included(self, datarow):
+    def is_memory_statistics_included(self, data_row):
         return len(data_row) == self.num_cols_with_memory
 
     def name(self):
