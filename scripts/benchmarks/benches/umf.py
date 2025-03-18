@@ -76,31 +76,47 @@ class ComputeUMFBenchmark(Benchmark):
 
     def run(self, env_vars) -> list[Result]:
         command = [
-            f"{self.benchmark_bin}",
+            f"{self.benchmark_bin}"
         ]
+
+        list_all_command = command + ["--benchmark_list_tests"]
+        umf_lib = options.umf + "lib"
+        # print("DIRECOTRY", umf_lib)
+        all_names = self.run_bench(
+            list_all_command, env_vars, add_sycl=False, ld_library=[umf_lib] #self.oneapi.tbb_lib()]
+        )
+
+        # print("all names:", all_names)
 
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
 
-        result = self.run_bench(
-            command, env_vars, add_sycl=False, ld_library=[self.oneapi.tbb_lib()]
-        )
-        parsed = self.parse_output(result)
         results = []
-        for r in parsed:
-            (config, pool, mean) = r
-            label = f"{config} {pool}"
-            results.append(
-                Result(
-                    label=label,
-                    value=mean,
-                    command=command,
-                    env=env_vars,
-                    stdout=result,
-                    unit="ns",
-                    explicit_group=config,
-                )
+
+        # print(all_names.splitlines())
+
+        for name in all_names.splitlines():
+            specific_benchmark = command + ["--benchmark_filter=" + name]
+            print(specific_benchmark)
+
+            result = self.run_bench(
+                specific_benchmark, env_vars, add_sycl=False, ld_library=[umf_lib] #self.oneapi.tbb_lib()]
             )
+            parsed = self.parse_output(result)
+            for r in parsed:
+                (config, pool, mean) = r
+                label = f"{config} {pool}"
+                results.append(
+                    Result(
+                        label=label,
+                        value=mean,
+                        command=command,
+                        env=env_vars,
+                        stdout=result,
+                        unit=self.unit(), #"ns",
+                        explicit_group=config,
+                    )
+                )
         return results
 
     # Implementation with self.col_* indices could lead to the division by None
@@ -188,6 +204,7 @@ class GBench(ComputeUMFBenchmark):
             raise ValueError("Benchmark output does not contain data.")
 
         results = []
+        print("len data row", len(data_row), "\ndata row:\n", data_row)
         for row in reader:
             try:
                 full_name = row[self.col_name]
