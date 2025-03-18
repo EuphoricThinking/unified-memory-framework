@@ -40,6 +40,7 @@ class UMFSuite(Suite):
             GBenchUmfProxy(self),
             GBenchJemalloc(self),
             GBenchTbbProxy(self),
+            GBenchMemoryOverhead(self),
         ]
 
         return benches
@@ -102,6 +103,7 @@ class ComputeUMFBenchmark(Benchmark):
             result = self.run_bench(
                 specific_benchmark, env_vars, add_sycl=False, ld_library=[umf_lib] #self.oneapi.tbb_lib()]
             )
+
             parsed = self.parse_output(result)
             for r in parsed:
                 (config, pool, mean) = r
@@ -132,18 +134,25 @@ class GBench(ComputeUMFBenchmark):
         super().__init__(bench, "umf-benchmark")
 
         self.is_preloaded = False
+        self.is_memory_overhead_checked = False
+
+        self.num_cols_with_memory = 13
 
         self.col_name = 0
         self.col_iterations = 1
         self.col_real_time = 2
         self.col_cpu_time = 3
         self.col_time_unit = 4
+        self.col_memory_overhead = 11
 
         self.idx_pool = 0
         self.idx_config = 1
         self.name_separator = "/"
 
         self.col_statistics_time = self.col_real_time
+
+    def is_memory_statistics_included(self, datarow):
+        return len(data_row) == self.num_cols_with_memory
 
     def name(self):
         return self.bench_name
@@ -174,6 +183,10 @@ class GBench(ComputeUMFBenchmark):
 
     def get_mean(self, datarow):
         return float(datarow[self.col_statistics_time])
+
+    def get_memory_overhead(self, datarow):
+        return float(datarow[self.col_memory_overhead])
+
 
     # def parse_output(self, output):
     #     csv_file = io.StringIO(output)
@@ -209,13 +222,27 @@ class GBench(ComputeUMFBenchmark):
             try:
                 full_name = row[self.col_name]
                 pool, config = self.get_pool_and_config(full_name)
-                mean = self.get_mean(row)
+                statistics = None
+                is_row_matched_to_statistics_type = False
 
-                if self.is_preloaded:
-                    pool = self.get_preloaded_name(pool)
-                    config = self.get_preloaded_name(config)
+                if not self.is_memory_overhead_checked \
+                and not self.is_memory_statistics_included(row):
+                    statistics = self.get_mean(row)
+                    is_row_matched_to_statistics_type = True
 
-                results.append((config, pool, mean))
+                    # At this moment, preloaded benchmarks 
+                    # do not support memory statitics
+                    if self.is_preloaded:
+                        pool = self.get_preloaded_name(pool)
+                        config = self.get_preloaded_name(config)
+
+                if self.is_memory_overhead_checked \
+                and self.is_memory_statistics_included(row):
+                    statistics = self.get_memory_overhead(row)
+                    is_row_matched_to_statistics_type = True
+
+                if is_row_matched_to_statistics_type:
+                    results.append((config, pool, statistics))
 
             except KeyError as e:
                 raise ValueError(f"Error parsing output: {e}")
@@ -295,3 +322,12 @@ class GBenchTbbProxy(GBenchGlibc):
 
     def extra_env_vars(self) -> dict:
         return {"LD_PRELOAD": "libtbbmalloc_proxy.so"}
+
+class GBenchMemoryOverhead(GBench):
+    def __init__(self, bench):
+        super().__init__(bench)
+
+        self.is_memory_overhead_checked = True
+
+    def unit(self):
+        return "%"
