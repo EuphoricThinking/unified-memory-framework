@@ -115,6 +115,8 @@ class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
         super().__init__(bench, "umf-benchmark")
 
+        self.is_preloaded = False
+
         self.col_name = 0
         self.col_iterations = 1
         self.col_real_time = 2
@@ -157,6 +159,26 @@ class GBench(ComputeUMFBenchmark):
     def get_mean(self, datarow):
         return float(datarow[self.col_statistics_time])
 
+    # def parse_output(self, output):
+    #     csv_file = io.StringIO(output)
+    #     reader = csv.reader(csv_file)
+
+    #     data_row = next(reader, None)
+    #     if data_row is None:
+    #         raise ValueError("Benchmark output does not contain data.")
+
+    #     results = []
+    #     for row in reader:
+    #         try:
+    #             full_name = row[self.col_name]
+    #             pool, config = self.get_pool_and_config(full_name)
+    #             mean = self.get_mean(row)
+    #             results.append((config, pool, mean))
+    #         except KeyError as e:
+    #             raise ValueError(f"Error parsing output: {e}")
+
+    #     return results
+    
     def parse_output(self, output):
         csv_file = io.StringIO(output)
         reader = csv.reader(csv_file)
@@ -171,7 +193,13 @@ class GBench(ComputeUMFBenchmark):
                 full_name = row[self.col_name]
                 pool, config = self.get_pool_and_config(full_name)
                 mean = self.get_mean(row)
+
+                if self.is_preloaded:
+                    pool = self.get_preloaded_name(pool)
+                    config = self.get_preloaded_name(config)
+
                 results.append((config, pool, mean))
+
             except KeyError as e:
                 raise ValueError(f"Error parsing output: {e}")
 
@@ -182,6 +210,8 @@ class GBenchPreloaded(GBench):
     def __init__(self, bench, lib_to_be_replaced, replacing_lib):
         super().__init__(bench)
 
+        self.is_preloaded = True
+        
         self.lib_to_be_replaced = lib_to_be_replaced
         self.replacing_lib = replacing_lib
 
@@ -196,28 +226,28 @@ class GBenchPreloaded(GBench):
 
         return new_pool_name
 
-    def parse_output(self, output):
-        csv_file = io.StringIO(output)
-        reader = csv.reader(csv_file)
+    # def parse_output(self, output):
+    #     csv_file = io.StringIO(output)
+    #     reader = csv.reader(csv_file)
 
-        data_row = next(reader, None)
-        if data_row is None:
-            raise ValueError("Benchmark output does not contain data.")
+    #     data_row = next(reader, None)
+    #     if data_row is None:
+    #         raise ValueError("Benchmark output does not contain data.")
 
-        results = []
-        for row in reader:
-            try:
-                full_name = row[self.col_name]
-                pool, config = self.get_pool_and_config(full_name)
-                mean = self.get_mean(row)
-                updated_pool = self.get_preloaded_name(pool)
-                updated_config = self.get_preloaded_name(config)
+    #     results = []
+    #     for row in reader:
+    #         try:
+    #             full_name = row[self.col_name]
+    #             pool, config = self.get_pool_and_config(full_name)
+    #             mean = self.get_mean(row)
+    #             updated_pool = self.get_preloaded_name(pool)
+    #             updated_config = self.get_preloaded_name(config)
 
-                results.append((updated_config, updated_pool, mean))
-            except KeyError as e:
-                raise ValueError(f"Error parsing output: {e}")
+    #             results.append((updated_config, updated_pool, mean))
+    #         except KeyError as e:
+    #             raise ValueError(f"Error parsing output: {e}")
 
-        return results
+    #     return results
 
 
 class GBenchGlibc(GBenchPreloaded):
