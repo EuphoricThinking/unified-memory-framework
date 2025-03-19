@@ -62,6 +62,9 @@ class ComputeUMFBenchmark(Benchmark):
 
         self.col_statistics_time = None
 
+        self.is_preloaded = False
+        self.lib_to_be_replaced = None
+
     def bin_args(self) -> list[str]:
         return []
 
@@ -81,13 +84,17 @@ class ComputeUMFBenchmark(Benchmark):
         ]
 
         list_all_command = command + ["--benchmark_list_tests"]
+        if self.is_preloaded:
+            print("PRELOADED names")
+            list_all_command += ["--benchmark_filter=" + self.lib_to_be_replaced]
+
         umf_lib = options.umf + "lib"
         # print("DIRECOTRY", umf_lib)
         all_names = self.run_bench(
             list_all_command, env_vars, add_sycl=False, ld_library=[umf_lib] #self.oneapi.tbb_lib()]
         )
 
-        # print("all names:", all_names)
+        print("all names:", all_names)
 
         command += self.bin_args()
         env_vars.update(self.extra_env_vars())
@@ -97,12 +104,20 @@ class ComputeUMFBenchmark(Benchmark):
         # print(all_names.splitlines())
 
         for name in all_names.splitlines():
+            """
+            TODO
+            check if benchmark is meant to be run
+            bname - if glibc included - ommit for memory benchamrks
+            parsing leave for safety check - in case of errors we can catch them then
+            """
             specific_benchmark = command + ["--benchmark_filter=" + name]
             print(specific_benchmark)
 
             result = self.run_bench(
                 specific_benchmark, env_vars, add_sycl=False, ld_library=[umf_lib] #self.oneapi.tbb_lib()]
             )
+
+            print("res", result)
 
             parsed = self.parse_output(result)
             for r in parsed:
@@ -133,7 +148,7 @@ class GBench(ComputeUMFBenchmark):
     def __init__(self, bench):
         super().__init__(bench, "umf-benchmark")
 
-        self.is_preloaded = False
+        # self.is_preloaded = False
         self.is_memory_overhead_checked = False
 
         self.num_cols_with_memory = 13
@@ -227,6 +242,7 @@ class GBench(ComputeUMFBenchmark):
 
                 if not self.is_memory_overhead_checked:
                     statistics = self.get_mean(row)
+                    
                     is_row_matched_to_statistics_type = True
 
                     # At this moment, preloaded benchmarks 
@@ -238,9 +254,12 @@ class GBench(ComputeUMFBenchmark):
                 if self.is_memory_overhead_checked \
                 and self.is_memory_statistics_included(row):
                     statistics = self.get_memory_overhead(row)
+                    print("FRAGMENTATION")
+                    config = "FRAGMENTATION_" + config
+
                     is_row_matched_to_statistics_type = True
 
-                print(statistics, is_row_matched_to_statistics_type)
+                print(row, "\n", statistics, is_row_matched_to_statistics_type)
 
                 if is_row_matched_to_statistics_type:
                     results.append((config, pool, statistics))
@@ -327,6 +346,8 @@ class GBenchTbbProxy(GBenchGlibc):
 class GBenchMemoryOverhead(GBench):
     def __init__(self, bench):
         super().__init__(bench)
+
+        print("OVERHEAD BENCHES")
 
         self.is_memory_overhead_checked = True
 
