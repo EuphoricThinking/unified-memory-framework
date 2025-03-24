@@ -17,9 +17,10 @@ on:
         description: Runner
         type: choice
         required: true
-        default: 'L0_PERF'
+        default: 'ubuntu-latest'
         options:
           - L0_PERF
+          - ubuntu-latest
 
 permissions:
   contents: write

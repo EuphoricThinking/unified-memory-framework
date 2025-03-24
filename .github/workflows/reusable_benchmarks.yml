@@ -100,12 +100,13 @@ jobs:
     - name: Checkout benchmark scripts
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
-        repository: intel/llvm
+        repository: EuphoricThinking/llvm
         # Note: The same ref is used in docs build (for dashboard generation)!
         #
         # 20.03.2025
         # branch: unify-benchmark-ci
-        ref: cae7049c78c697b3ac94f931716d9efb53addcd8
+        # EuphoricThinking LLVM branch
+        ref: 0113c17905b80fe5aec0b966364cdf974c4d7bbd # cae7049c78c697b3ac94f931716d9efb53addcd8
         path: sc
         sparse-checkout: |
           devops/scripts/benchmarks
