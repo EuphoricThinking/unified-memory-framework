@@ -31,7 +31,7 @@ jobs:
   benchmarks:
     name: Benchmarks
     # run only on upstream; forks will not have the HW
-    if: github.repository == 'oneapi-src/unified-memory-framework'
+    # if: github.repository == 'oneapi-src/unified-memory-framework'
     runs-on: ${{ inputs.runner }}
 
     steps:
